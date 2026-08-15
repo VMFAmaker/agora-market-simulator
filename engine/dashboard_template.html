@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agora Market Simulator</title>
+<!--
+  The Agora dashboard.
+  Two sources: a made-up SIMULATION (the agent model) and REAL market prices.
+  The chart, the strategy tester and the side panels are shared by both.
+  Coding done with the help of AI, because coding is not the author's strong area.
+-->
+<style>
+  :root{--bg:#0e1420;--panel:#141d2e;--panel2:#101828;--line:#223049;--text:#c9d5e6;
+    --muted:#7c8aa0;--up:#26a69a;--down:#ef5350;--accent:#2dd4bf;--grid:#1a2438;}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px}
+  .wrap{max-width:1300px;margin:0 auto;padding:18px}
+
+  /* top bar */
+  .topbar{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;
+    gap:14px;border-bottom:1px solid var(--line);padding-bottom:14px}
+  .brand h1{margin:0;font-size:22px;letter-spacing:3px;font-weight:700}
+  .brand h1 span{color:var(--accent)}
+  .brand .sub{color:var(--muted);font-size:12px;letter-spacing:.5px;margin-top:2px}
+  .quote{text-align:right}
+  .quote .name{color:var(--muted);font-size:12px}
+  .price{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+  .chg{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+  .up{color:var(--up)} .down{color:var(--down)}
+
+  /* layout */
+  .layout{display:grid;grid-template-columns:1fr 300px;gap:16px;margin-top:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .bar.row2{padding-top:0}
+  .spacer{flex:1}
+  .lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.7px}
+
+  /* buttons and toggles */
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{background:transparent;color:var(--muted);border:0;padding:6px 11px;cursor:pointer;font-size:12.5px;font-weight:600}
+  .seg button.on{background:var(--accent);color:#06231f}
+  .seg.blue button.on{background:#33507a;color:#fff}
+  .seg.big button{padding:8px 16px;font-size:13px}
+  .btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;
+    padding:6px 12px;cursor:pointer;font-size:12.5px;font-weight:600}
+  .btn:hover{border-color:var(--accent)}
+  .btn.live.on{color:var(--up);border-color:var(--up)} .btn.live.off{color:#06231f;background:var(--accent);border-color:var(--accent)}
+  select,input[type=number]{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:6px;padding:5px 7px;font-size:12.5px;font-weight:600}
+  input[type=number]{width:60px}
+  .field{display:inline-flex;align-items:center;gap:4px;margin-left:6px}
+  .field span{color:var(--muted);font-size:11px}
+  .hidden{display:none !important}
+
+  /* chart */
+  .chartbox{position:relative;padding:6px}
+  canvas{display:block;width:100%;height:452px;cursor:crosshair}
+  .badge{position:absolute;top:12px;left:16px;background:#0b1220dd;border:1px solid var(--accent);
+    color:var(--accent);font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px;display:none;z-index:4}
+  .tip{position:absolute;pointer-events:none;background:#0b1220ee;border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;font-size:12px;line-height:1.5;opacity:0;transition:opacity .08s;white-space:nowrap;z-index:5}
+
+  /* side panels, collapsible */
+  .side{display:flex;flex-direction:column;gap:14px}
+  .side h3{margin:0;padding:11px 13px;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);
+    font-weight:700;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+  .side h3 .arrow{transition:transform .15s;color:var(--accent);font-size:11px}
+  .card .body{border-top:1px solid var(--line)}
+  .card.closed .body{display:none}
+  .card.closed h3 .arrow{transform:rotate(-90deg)}
+
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
+  .cell{background:var(--panel);padding:9px 6px;text-align:center}
+  .cell .k{color:var(--muted);font-size:11px;font-weight:700}
+  .cell .v{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+  .rows{padding:6px 13px 12px}
+  .r{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--panel2);font-variant-numeric:tabular-nums}
+  .r:last-child{border-bottom:0}
+  .r .k{color:var(--muted)} .r .v{font-weight:600}
+  .tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:6px}
+  .tag.yes{background:#123b34;color:var(--up)} .tag.no{background:#3b1414;color:var(--down)}
+  .leg{padding:8px 13px 12px}
+  .lr{display:flex;align-items:center;gap:8px;padding:4px 0;font-variant-numeric:tabular-nums}
+  .sw{width:11px;height:11px;border-radius:3px;flex:none}
+  .lr .nm{text-transform:capitalize;flex:1}
+  .foot{color:var(--muted);font-size:11px;margin-top:16px;text-align:center;line-height:1.6}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- header -->
+  <div class="topbar">
+    <div class="brand">
+      <h1>AG<span>O</span>RA</h1>
+      <div class="sub" id="sub">MARKET SIMULATOR</div>
+    </div>
+    <div class="quote">
+      <div class="name" id="qname">AGX</div>
+      <div class="price" id="price">--</div>
+      <div class="chg" id="chg">--</div>
+    </div>
+  </div>
+
+  <!-- the one big choice: simulation or real market -->
+  <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div class="seg big" id="sourceSeg">
+      <button data-src="sim" class="on">Simulation</button>
+      <button data-src="real">Real market</button>
+    </div>
+    <span class="lbl" id="srcHint">A made-up market from a crowd of trading agents. Plays live and can be sped up.</span>
+  </div>
+
+  <div class="layout">
+    <!-- chart card -->
+    <div class="card">
+      <div class="bar" id="bar1"></div>
+      <div class="bar row2" id="bar2"></div>
+      <div class="chartbox">
+        <canvas id="chart"></canvas>
+        <div class="badge" id="badge">&#9208; LOOKING BACK &middot; click Live</div>
+        <div class="tip" id="tip"></div>
+      </div>
+    </div>
+
+    <!-- side panels -->
+    <div class="side">
+      <div class="card" id="cardGrowth"><h3 data-card="cardGrowth">Growth<span class="arrow">&#9660;</span></h3>
+        <div class="body"><div class="grid4" id="growth"></div></div></div>
+      <div class="card" id="cardStats"><h3 data-card="cardStats">Details<span class="arrow">&#9660;</span></h3>
+        <div class="body"><div class="rows" id="stats"></div></div></div>
+      <div class="card" id="cardSide3"><h3 data-card="cardSide3" id="side3Title">Profit by agent<span class="arrow">&#9660;</span></h3>
+        <div class="body"><div class="leg" id="side3"></div></div></div>
+    </div>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const SIM = __SIM_DATA__;
+const REAL = __REAL_DATA__;
+(function(){
+  // ---------- small helpers ----------
+  const el=(id)=>document.getElementById(id);
+  const cv=el('chart'), ctx=cv.getContext('2d'), tip=el('tip');
+  const css=(n)=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const UP=css('--up'),DOWN=css('--down'),MUTED=css('--muted'),GRID=css('--grid'),TEXT=css('--text'),ACCENT=css('--accent');
+  const AGENT_COLOR={value:'#26a69a',momentum:'#e0a458',noise:'#8a94a6',maker:'#2dd4bf',leveraged:'#ef5350',
+    meanrev:'#a78bfa',breakout:'#60a5fa',news:'#f472b6',whale:'#22d3ee',panic:'#fb923c'};
+  const money2=(x)=>x.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const dollars=(x)=>(x<0?'-':'+')+'$'+Math.abs(x).toLocaleString(undefined,{maximumFractionDigits:0});
+  const pctTxt=(x)=>(x>=0?'+':'')+x.toFixed(2)+'%';
+  const shortMoney=(x)=>{const a=Math.abs(x),s=x<0?'-':'';return a>=1e6?s+'$'+(a/1e6).toFixed(1)+'m':a>=1e3?s+'$'+(a/1e3).toFixed(0)+'k':s+'$'+a.toFixed(0);};
+  const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+
+  // ---------- what are we looking at ----------
+  let source='sim';                 // 'sim' or 'real'
+  let view='price';                 // 'price', 'agents' (sim only), 'backtest'
+  let mode='candle';                // 'candle' or 'line'
+  let hover=-1;
+
+  // simulation state
+  let scen='baseline', tf=15;
+  let nowMin=0, elapsed=0, playing=true, speed=0.016667, lastTick=0, clockStartSec=0;
+  let follow=true, simEnd=0, WIN=110;
+
+  // real market state
+  let instIndex=0, currency='USD', realEnd=0;
+
+  // strategy tester state
+  const RULES={bh:{name:'Buy & hold',p:[]},
+    sma:{name:'Moving average cross',p:[['fast','fast',10,3,90,1],['slow','slow',40,10,300,5]]},
+    mom:{name:'Momentum',p:[['win','lookback',20,3,120,1],['thr','threshold %',2,0.2,10,0.2]]},
+    mr:{name:'Mean reversion',p:[['win','window',20,5,120,1],['band','buy below %',3,0.5,15,0.5]]},
+    breakout:{name:'Breakout',p:[['win','channel',20,5,120,1]]},
+    dip:{name:'Buy the dip',p:[['drop','dip %',6,1,30,0.5],['rise','take profit %',8,1,40,0.5]]}};
+  let btRule='sma', btParams={}, btLev=1, bt=null;
+
+  // ---------- the candles we are showing right now ----------
+  function scenarioData(){ return SIM.scenarios[scen]; }
+  function instrument(){ return REAL.instruments[instIndex]; }
+
+  function series(){
+    if(source==='sim') return aggregate(scenarioData().candles, tf);
+    // real market: apply the currency choice, then optionally group days
+    const inst=instrument(); const r=(currency==='GBP')?REAL.usd_to_gbp:1;
+    let cs=inst.candles;
+    if(r!==1) cs=cs.map(b=>({t:b.t,d:b.d,o:b.o*r,h:b.h*r,l:b.l*r,c:b.c*r,v:b.v}));
+    return cs;
+  }
+  function aggregate(base,k){
+    if(k<=1) return base;
+    const out=[];
+    for(let i=0;i<base.length;i+=k){
+      let h=-1e9,l=1e9,v=0,liq=0,halt=0;
+      for(let j=i;j<Math.min(i+k,base.length);j++){const b=base[j];if(b.h>h)h=b.h;if(b.l<l)l=b.l;v+=b.v;liq+=b.liq||0;if(b.halt)halt=1;}
+      const a=base[i], z=base[Math.min(i+k,base.length)-1];
+      out.push({t:0.5*(a.t+z.t),o:a.o,h,l,c:z.c,v,liq,halt});
+    }
+    return out;
+  }
+
+  // ---------- geometry ----------
+  const L=12,R=60,T=12,B=24,GAP=30; let dpr=1;
+  function resize(){dpr=window.devicePixelRatio||1;const w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw();}
+  const xAt=(i,n,w)=>{const inner=w-L-R;return L+(n<=1?inner:inner*i/(n-1));};
+  const yAt=(p,lo,hi,yT,yB)=>yT+(yB-yT)*(hi-p)/((hi-lo)||1);
+  function withAlpha(hex,a){hex=hex.replace('#','');if(hex.length===3)hex=hex.split('').map(c=>c+c).join('');
+    return 'rgba('+parseInt(hex.slice(0,2),16)+','+parseInt(hex.slice(2,4),16)+','+parseInt(hex.slice(4,6),16)+','+a+')';}
+
+  // time / date label for a candle on the x axis
+  function xLabel(bar){
+    if(source==='real') return bar.d ? bar.d.slice(2) : '';           // yy-mm-dd
+    const sec=clockStartSec+(elapsed-(nowMin-bar.t))*60;              // sim: a running clock
+    const s=((sec%86400)+86400)%86400, p=(x)=>String(x).padStart(2,'0');
+    return p(Math.floor(s/3600))+':'+p(Math.floor(s%3600/60));
+  }
+  function clockNow(){const sec=clockStartSec+elapsed*60,s=((sec%86400)+86400)%86400,p=(x)=>String(x).padStart(2,'0');
+    return p(Math.floor(s/3600))+':'+p(Math.floor(s%3600/60))+':'+p(Math.floor(s%60));}
+
+  // the smooth "current price" while a simulation plays
+  function simPrice(){const c=scenarioData().candles,rel=nowMin-c[0].t;let i=Math.floor(rel);
+    if(i<0)return c[0].c;if(i>=c.length-1)return c[c.length-1].c;return c[i].c+(c[i+1].c-c[i].c)*(rel-i);}
+
+  // which slice of candles is on screen
+  function windowSlice(){
+    const s=series(); let end;
+    if(source==='sim'){const edge=follow?nowMin:Math.min(simEnd,nowMin);end=0;while(end<s.length&&s[end].t<=edge)end++;}
+    else end=realEnd+1;
+    end=clamp(end,1,s.length);
+    const a=Math.max(0,end-WIN);
+    return {all:s,V:s.slice(a,end),n:end-a,end};
+  }
+
+  // ---------- drawing ----------
+  function gridY(lo,hi,yT,yB,w){ctx.font='11px Segoe UI';ctx.textBaseline='middle';
+    for(let i=0;i<=4;i++){const p=lo+(hi-lo)*i/4,y=yAt(p,lo,hi,yT,yB);
+      ctx.strokeStyle=GRID;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();
+      ctx.fillStyle=MUTED;ctx.textAlign='left';ctx.fillText(money2(p),w-R+6,y);}}
+  function xAxis(V,n,w,yLine){ctx.textAlign='center';ctx.textBaseline='top';ctx.font='11px Segoe UI';
+    for(let i=0;i<=6;i++){const idx=Math.round((n-1)*i/6);ctx.fillStyle=MUTED;ctx.fillText(xLabel(V[idx]),xAt(idx,n,w),yLine+5);}}
+
+  function drawPrice(V,n,yT,yB,w,marks){
+    let lo=1e18,hi=-1e18;for(const d of V){if(d.l<lo)lo=d.l;if(d.h>hi)hi=d.h;}
+    const pad=(hi-lo)*0.1||1;lo-=pad;hi+=pad;gridY(lo,hi,yT,yB,w);
+    const bw=(w-L-R)/Math.max(1,n);
+    ctx.fillStyle='rgba(150,160,180,0.14)';for(let i=0;i<n;i++)if(V[i].halt)ctx.fillRect(xAt(i,n,w)-bw/2,yT,Math.max(2,bw),yB-yT);
+    for(let i=0;i<n;i++){if(!V[i].liq)continue;const x=xAt(i,n,w);ctx.fillStyle=DOWN;ctx.beginPath();
+      ctx.moveTo(x-4,yT+1);ctx.lineTo(x+4,yT+1);ctx.lineTo(x,yT+8);ctx.closePath();ctx.fill();}
+    if(mode==='line'){const col=V[n-1].c>=V[0].c?UP:DOWN;const g=ctx.createLinearGradient(0,yT,0,yB);
+      g.addColorStop(0,withAlpha(col,0.26));g.addColorStop(1,withAlpha(col,0));
+      ctx.beginPath();for(let i=0;i<n;i++){const x=xAt(i,n,w),y=yAt(V[i].c,lo,hi,yT,yB);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+      ctx.lineTo(xAt(n-1,n,w),yB);ctx.lineTo(xAt(0,n,w),yB);ctx.closePath();ctx.fillStyle=g;ctx.fill();
+      ctx.lineWidth=1.8;ctx.lineJoin='round';for(let i=1;i<n;i++){ctx.strokeStyle=V[i].c>=V[i-1].c?UP:DOWN;
+        ctx.beginPath();ctx.moveTo(xAt(i-1,n,w),yAt(V[i-1].c,lo,hi,yT,yB));ctx.lineTo(xAt(i,n,w),yAt(V[i].c,lo,hi,yT,yB));ctx.stroke();}}
+    else{const step=(w-L-R)/n,cw=Math.max(1,Math.min(9,step*0.66));
+      for(let i=0;i<n;i++){const x=xAt(i,n,w),d=V[i],up=d.c>=d.o,col=up?UP:DOWN;ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(x,yAt(d.h,lo,hi,yT,yB));ctx.lineTo(x,yAt(d.l,lo,hi,yT,yB));ctx.stroke();
+        const yo=yAt(d.o,lo,hi,yT,yB),yc=yAt(d.c,lo,hi,yT,yB);ctx.fillRect(x-cw/2,Math.min(yo,yc),cw,Math.max(1,Math.abs(yc-yo)));}}
+    if(marks&&bt){const tA=V[0].t,tB=V[n-1].t,span=(tB-tA)||1,xt=(t)=>L+(w-L-R)*(t-tA)/span;
+      for(const m of bt.trades){if(m.t<tA||m.t>tB)continue;const x=xt(m.t),y=yAt(m.price,lo,hi,yT,yB);ctx.fillStyle=m.side==='buy'?UP:DOWN;
+        ctx.beginPath();if(m.side==='buy'){ctx.moveTo(x,y+5);ctx.lineTo(x-4,y+12);ctx.lineTo(x+4,y+12);}else{ctx.moveTo(x,y-5);ctx.lineTo(x-4,y-12);ctx.lineTo(x+4,y-12);}ctx.closePath();ctx.fill();}}
+    const last=(source==='sim'&&follow)?simPrice():V[n-1].c,ly=yAt(last,lo,hi,yT,yB),lx=xAt(n-1,n,w),up=last>=V[0].c;
+    ctx.strokeStyle=withAlpha(up?UP:DOWN,0.5);ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(L,ly);ctx.lineTo(w-R,ly);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=up?UP:DOWN;ctx.beginPath();ctx.arc(lx,ly,3.2,0,7);ctx.fill();
+    if(hover>=0&&hover<n){const hx=xAt(hover,n,w);ctx.strokeStyle=withAlpha(TEXT,0.25);ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(hx,yT);ctx.lineTo(hx,yB);ctx.stroke();ctx.setLineDash([]);
+      const d=V[hover],u=d.c>=d.o;tip.style.opacity=1;
+      tip.innerHTML='<b>'+(d.d||xLabel(d))+'</b><br>O '+money2(d.o)+'  H '+money2(d.h)+'<br>L '+money2(d.l)
+        +'  <span class="'+(u?'up':'down')+'">C '+money2(d.c)+'</span>'+(d.v?'<br>Vol '+d.v.toLocaleString():'');}
+    return {tA:V[0].t,tB:V[n-1].t};
+  }
+
+  function subFrame(lo,hi,yT,yB,w,asPct){ctx.font='10px Segoe UI';ctx.textBaseline='middle';ctx.fillStyle=MUTED;ctx.textAlign='left';
+    for(const p of [hi,lo]){const y=yAt(p,lo,hi,yT,yB);ctx.fillText(asPct?pctTxt(p):shortMoney(p),w-R+6,y);}
+    if(lo<0&&hi>0){const y0=yAt(0,lo,hi,yT,yB);ctx.strokeStyle=withAlpha(TEXT,0.3);ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(L,y0);ctx.lineTo(w-R,y0);ctx.stroke();ctx.setLineDash([]);}}
+
+  function drawAgents(tA,tB,yT,yB,w){                       // simulation only
+    const st=scenarioData().strategy,kinds=Object.keys(st.series),Tt=st.t;
+    let a=0;while(a<Tt.length&&Tt[a]<tA)a++;a=Math.max(0,a-1);let b=a;while(b<Tt.length&&Tt[b]<=tB)b++;b=Math.min(Tt.length,b+1);
+    let lo=0,hi=0;for(const k of kinds){const s=st.series[k];for(let i=a;i<b;i++){if(s[i]<lo)lo=s[i];if(s[i]>hi)hi=s[i];}}
+    const pad=(hi-lo)*0.14||1;lo-=pad;hi+=pad;subFrame(lo,hi,yT,yB,w,false);
+    const span=(tB-tA)||1,xt=(t)=>L+(w-L-R)*(t-tA)/span;ctx.save();ctx.beginPath();ctx.rect(L,yT-2,w-R-L,yB-yT+4);ctx.clip();
+    for(const k of kinds){const s=st.series[k];ctx.strokeStyle=AGENT_COLOR[k]||'#888';ctx.lineWidth=1.9;ctx.lineJoin='round';
+      ctx.beginPath();for(let i=a;i<b;i++){const x=xt(Tt[i]),y=yAt(s[i],lo,hi,yT,yB);i===a?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();}
+    ctx.restore();ctx.fillStyle=MUTED;ctx.textAlign='left';ctx.font='11px Segoe UI';ctx.fillText('running profit of each agent type',L+2,yT+9);}
+
+  function drawEquity(tA,tB,yT,yB,w){                       // strategy tester
+    const cs=series(),a=idxAt(cs,tA),b=Math.min(cs.length,idxAt(cs,tB)+1);
+    let lo=0,hi=0;for(let i=a;i<b;i++){lo=Math.min(lo,bt.eqPct[i],bt.bhPct[i]);hi=Math.max(hi,bt.eqPct[i],bt.bhPct[i]);}
+    const pad=(hi-lo)*0.14||1;lo-=pad;hi+=pad;subFrame(lo,hi,yT,yB,w,true);
+    const span=(tB-tA)||1,xt=(t)=>L+(w-L-R)*(t-tA)/span;ctx.save();ctx.beginPath();ctx.rect(L,yT-2,w-R-L,yB-yT+4);ctx.clip();
+    ctx.strokeStyle=withAlpha(TEXT,0.45);ctx.lineWidth=1.4;ctx.beginPath();
+    for(let i=a;i<b;i++){const x=xt(cs[i].t),y=yAt(bt.bhPct[i],lo,hi,yT,yB);i===a?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();
+    ctx.strokeStyle=ACCENT;ctx.lineWidth=2;ctx.beginPath();
+    for(let i=a;i<b;i++){const x=xt(cs[i].t),y=yAt(bt.eqPct[i],lo,hi,yT,yB);i===a?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();
+    ctx.restore();ctx.fillStyle=MUTED;ctx.textAlign='left';ctx.font='11px Segoe UI';ctx.fillText(RULES[btRule].name+' (teal) vs buy & hold (grey)',L+2,yT+9);}
+  const idxAt=(cs,t)=>{let lo=0,hi=cs.length-1;while(lo<hi){const m=(lo+hi)>>1;if(cs[m].t<t)lo=m+1;else hi=m;}return Math.max(0,lo);};
+
+  function draw(){
+    const w=cv.clientWidth,h=cv.clientHeight;ctx.clearRect(0,0,w,h);
+    const win=windowSlice(),V=win.V,n=win.n;if(n<1)return;
+    const split=(view!=='price');
+    if(!split){const r=drawPrice(V,n,T,h-B,w,false);xAxis(V,n,w,h-B);}
+    else{const topB=T+(h-T-B-GAP)*0.6,botT=topB+GAP,botB=h-B;
+      const r=drawPrice(V,n,T,topB,w,view==='backtest');
+      if(view==='backtest')drawEquity(r.tA,r.tB,botT,botB,w);else drawAgents(r.tA,r.tB,botT,botB,w);
+      xAxis(V,n,w,botB);}
+    updateHeader();fillGrowth();el('badge').style.display=(source==='sim'&&!follow)?'block':'none';
+  }
+
+  // ---------- header + side panels ----------
+  function currentClose(){if(source==='sim')return follow?simPrice():windowSlice().V.slice(-1)[0].c;return series().slice(-1)[0].c;}
+  function firstClose(){return series()[0].c;}
+  function updateHeader(){
+    const cur=source==='sim'?(follow?simPrice():windowSlice().V.slice(-1)[0].c):series()[realEnd].c;
+    const prev=source==='sim'?firstClose():series()[Math.max(0,realEnd-1)].c;
+    const chg=cur-prev,p=prev?chg/prev*100:0,cls=chg>=0?'up':'down';
+    el('price').textContent=(currency==='GBP'?'£':'$')+money2(cur);el('price').className='price '+cls;
+    el('chg').className='chg '+cls;el('chg').textContent=(chg>=0?'▲ ':'▼ ')+money2(Math.abs(chg))+'  ('+pctTxt(p)+')';
+    if(source==='sim'){el('qname').textContent='AGX  ·  '+clockNow();}
+    else{const inst=instrument();el('qname').textContent=inst.name+'  ·  '+series()[realEnd].d;}
+  }
+  function fillGrowth(){
+    const cs=series();const end=source==='sim'?Math.max(0,Math.min(cs.length-1,Math.round(nowMin-cs[0].t))):realEnd;
+    const cur=cs[end].c;
+    const wins=source==='sim'?[['1m',1],['5m',5],['15m',15],['30m',30]]:[['1D',1],['1W',5],['1M',22],['3M',66]];
+    el('growth').innerHTML=wins.map(function(wn){const ref=cs[Math.max(0,end-wn[1])].c,g=(cur/ref-1)*100,cls=g>=0?'up':'down';
+      return '<div class="cell"><div class="k">'+wn[0]+'</div><div class="v '+cls+'">'+pctTxt(g)+'</div></div>';}).join('');
+  }
+  function fillStats(){
+    let rows;
+    if(view==='backtest'&&bt){const s=bt.stats,al=s.ret-s.bhret;
+      rows=[['Strategy return',pctTxt(s.ret),s.ret>=0?'up':'down'],['Buy & hold',pctTxt(s.bhret),s.bhret>=0?'up':'down'],
+        ['Beats hold by',pctTxt(al),al>=0?'up':'down'],['Round trips',s.trades,''],['Win rate',s.win.toFixed(0)+'%',''],
+        ['Worst drop',s.maxdd.toFixed(1)+'%','down'],['In the market',s.timeIn.toFixed(0)+'%','']];
+      if(bt.blew)rows.unshift(['Outcome','BLEW UP','down']);
+    } else if(source==='sim'){const s=scenarioData().summary,f=scenarioData().facts;
+      const tag=(ok)=>'<span class="tag '+(ok?'yes':'no')+'">'+(ok?'yes':'no')+'</span>';
+      rows=[['Change over run',pctTxt(s.pct),s.pct>=0?'up':'down'],['High',money2(s.high),''],['Low',money2(s.low),''],
+        ['Worst drop',s.max_drawdown.toFixed(1)+'%','down'],['Forced sales',s.n_liquidations,''],['Halts',s.n_halts,''],
+        ['Looks real? fat tails',(f.kurtosis!=null?f.kurtosis:'--')+' '+tag(f.pass_fat_tails),''],
+        ['Looks real? clustering',(f.vol_clustering!=null?f.vol_clustering:'--')+' '+tag(f.pass_vol_clustering),'']];
+    } else {const cs=series(),inst=instrument();let hi=-1e18,lo=1e18;for(const b of cs){if(b.h>hi)hi=b.h;if(b.l<lo)lo=b.l;}
+      const sym=currency==='GBP'?'£':'$';
+      rows=[['Market',inst.name,''],['Group',inst.group,''],['Shown in',currency,''],
+        ['Last price',sym+money2(cs[realEnd].c),''],['2y high',sym+money2(hi),''],['2y low',sym+money2(lo),''],
+        ['As of',cs[realEnd].d,''],['Days of data',cs.length,'']];
+    }
+    el('stats').innerHTML=rows.map(r=>'<div class="r"><span class="k">'+r[0]+'</span><span class="v'+(r[2]?' '+r[2]:'')+'">'+r[1]+'</span></div>').join('');
+  }
+  function fillSide3(){
+    if(view==='backtest'){el('side3Title').firstChild.textContent='How to read it';
+      el('side3').innerHTML='<div style="color:var(--muted);font-size:12px;line-height:1.6">The teal line is your rule’s account. '
+        +'The grey line is simply buying and holding. Green triangles are buys, red are sells. Costs (the spread and a small fee) '
+        +'are charged on every trade. Turn up leverage to trade bigger, and risk a blow-up.</div>';return;}
+    if(source==='real'){el('side3Title').firstChild.textContent='About';
+      el('side3').innerHTML='<div style="color:var(--muted);font-size:12px;line-height:1.6">Real daily prices from a public source, '
+        +'a snapshot from when this page was built ('+REAL.fetched+'). Real markets do not fast-forward, so scroll the chart to look '
+        +'around. Try the Strategy tester on this real data.</div>';return;}
+    el('side3Title').firstChild.textContent='Profit by agent';
+    el('side3').innerHTML=scenarioData().agents.map(function(a){const c=AGENT_COLOR[a.kind]||'#888',pos=a.pnl>=0;
+      return '<div class="lr"><span class="sw" style="background:'+c+'"></span><span class="nm">'+a.kind+'</span>'
+        +'<span class="'+(pos?'up':'down')+'">'+dollars(a.pnl)+'</span></div>';}).join('');
+  }
+  function fillSidePanels(){fillStats();fillSide3();}
+
+  // ---------- the strategy tester (runs a rule on the shown prices) ----------
+  const START=100000;
+  const avg=(P,w)=>{const n=P.length,o=new Array(n).fill(null);let s=0;for(let i=0;i<n;i++){s+=P[i];if(i>=w)s-=P[i-w];if(i>=w-1)o[i]=s/w;}return o;};
+  function positions(P,rule,pm){const n=P.length,pos=new Array(n).fill(0);
+    if(rule==='bh'){pos.fill(1);return pos;}
+    if(rule==='sma'){const f=avg(P,pm.fast|0),s=avg(P,pm.slow|0);for(let i=0;i<n;i++)pos[i]=(f[i]!=null&&s[i]!=null&&f[i]>=s[i])?1:0;return pos;}
+    if(rule==='mom'){const w=pm.win|0,thr=pm.thr/100;let st=0;for(let i=0;i<n;i++){if(i>=w){const R=P[i]/P[i-w]-1;if(st===0&&R>thr)st=1;else if(st===1&&R<-thr*0.5)st=0;}pos[i]=st;}return pos;}
+    if(rule==='mr'){const w=pm.win|0,band=pm.band/100,m=avg(P,w);let st=0;for(let i=0;i<n;i++){if(m[i]!=null){if(st===0&&P[i]<m[i]*(1-band))st=1;else if(st===1&&P[i]>=m[i])st=0;}pos[i]=st;}return pos;}
+    if(rule==='breakout'){const w=pm.win|0;let st=0;for(let i=0;i<n;i++){if(i>=w){let hi=-1e18,lo=1e18;for(let j=i-w;j<i;j++){if(P[j]>hi)hi=P[j];if(P[j]<lo)lo=P[j];}if(st===0&&P[i]>hi)st=1;else if(st===1&&P[i]<lo)st=0;}pos[i]=st;}return pos;}
+    if(rule==='dip'){const drop=pm.drop/100,rise=pm.rise/100;let st=0,peak=P[0],entry=0;for(let i=0;i<n;i++){peak=Math.max(peak,P[i]);if(st===0){if(P[i]<peak*(1-drop)){st=1;entry=P[i];}}else{if(P[i]>entry*(1+rise)){st=0;peak=P[i];}}pos[i]=st;}return pos;}
+    return pos;}
+  function runBacktest(){
+    const cs=series(),P=cs.map(b=>b.c),n=P.length,pos=positions(P,btRule,btParams);
+    const halfSpread=(source==='sim'?(scenarioData().summary.avg_spread||0):P[n-1]*0.0005)*0.5;
+    const fee=(source==='sim'?(scenarioData().config.taker_fee||0.0002):0.0002);
+    let cash=START,shares=0,entry=0,wins=0,trips=0,blew=false;const eq=new Array(n),trades=[];
+    for(let i=0;i<n&&!blew;i++){const price=P[i];
+      const target=pos[i]===1?btLev*Math.max(cash+shares*price,0)/price:0;   // shares we want to hold
+      if(pos[i]===1&&shares<=0){const fill=price+halfSpread;shares=target;cash-=shares*fill;cash-=shares*fill*fee;entry=fill;trades.push({t:cs[i].t,side:'buy',price:fill});}
+      else if(pos[i]===0&&shares>0){const fill=price-halfSpread;cash+=shares*fill;cash-=shares*fill*fee;trips++;if(fill>entry)wins++;shares=0;trades.push({t:cs[i].t,side:'sell',price:fill});}
+      const equity=cash+shares*price;eq[i]=equity;if(equity<=0){blew=true;for(let j=i;j<n;j++)eq[j]=0;}
+    }
+    const bh=P.map(p=>START*p/P[0]);let peak=-1e18,dd=0;for(const e of eq){if(e>peak)peak=e;const d=peak>0?e/peak-1:0;if(d<dd)dd=d;}
+    bt={trades,eqPct:eq.map(e=>e/START*100-100),bhPct:bh.map(e=>e/START*100-100),blew,
+      stats:{ret:eq[n-1]/START*100-100,bhret:bh[n-1]/START*100-100,trades:trips,win:trips?wins/trips*100:0,maxdd:dd*100,timeIn:pos.reduce((a,b)=>a+b,0)/n*100}};
+  }
+
+  // ---------- building the control bars ----------
+  function button(seg,dataAttr,val,label,on){return '<button data-'+dataAttr+'="'+val+'"'+(on?' class="on"':'')+'>'+label+'</button>';}
+  function buildBars(){
+    let b1='',b2='';
+    if(source==='sim'){
+      b1+='<button class="btn" id="playBtn">&#10073;&#10073; Pause</button>';
+      b1+='<button class="btn live '+(follow?'on':'off')+'" id="liveBtn">&#9679; Live</button>';
+      b1+='<span class="lbl" style="margin-left:6px">Speed</span><div class="seg" id="speedSeg">'
+        +button('speedSeg','sp','0.016667','Real time',speed<0.02)+button('speedSeg','sp','1','60&times;',speed===1)+button('speedSeg','sp','5','300&times;',speed===5)+'</div>';
+      b1+='<div class="spacer"></div><div class="seg blue" id="viewSeg">'
+        +button('viewSeg','view','price','Price',view==='price')+button('viewSeg','view','agents','Agents',view==='agents')+button('viewSeg','view','backtest','Strategy tester',view==='backtest')+'</div>';
+      b2+='<div class="seg" id="scenSeg">'+button('scenSeg','scen','baseline','Normal',scen==='baseline')
+        +button('scenSeg','scen','stress','Leverage crash',scen==='stress')+button('scenSeg','scen','breaker','Crash + breaker',scen==='breaker')+button('scenSeg','scen','full','Full market',scen==='full')+'</div>';
+      b2+='<span class="lbl" style="margin-left:6px">TF</span><div class="seg" id="tfSeg">'
+        +button('tfSeg','tf','1','1m',tf===1)+button('tfSeg','tf','5','5m',tf===5)+button('tfSeg','tf','15','15m',tf===15)+button('tfSeg','tf','30','30m',tf===30)+'</div>';
+    } else {
+      b1+='<span class="lbl">Market</span><select id="instSel">'+REAL.instruments.map((m,i)=>'<option value="'+i+'"'+(i===instIndex?' selected':'')+'>'+m.group+' – '+m.name+'</option>').join('')+'</select>';
+      b1+='<span class="lbl" style="margin-left:8px">Show in</span><div class="seg" id="curSeg">'+button('curSeg','cur','USD','USD',currency==='USD')+button('curSeg','cur','GBP','GBP',currency==='GBP')+'</div>';
+      b1+='<div class="spacer"></div><div class="seg blue" id="viewSeg">'+button('viewSeg','view','price','Price',view==='price')+button('viewSeg','view','backtest','Strategy tester',view==='backtest')+'</div>';
+    }
+    b2+='<div class="seg" id="modeSeg">'+button('modeSeg','mode','candle','Candles',mode==='candle')+button('modeSeg','mode','line','Line',mode==='line')+'</div>';
+    if(view==='backtest'){b2+='<span class="lbl" style="margin-left:6px">Rule</span><select id="ruleSel">'
+      +Object.keys(RULES).map(k=>'<option value="'+k+'"'+(k===btRule?' selected':'')+'>'+RULES[k].name+'</option>').join('')+'</select><span id="ruleParams"></span>'
+      +'<span class="field"><span>leverage</span><input type="number" id="levInput" value="'+btLev+'" min="1" max="10" step="0.5"></span>';}
+    el('bar1').innerHTML=b1;el('bar2').innerHTML=b2;
+    if(view==='backtest')fillRuleParams();
+    wireBars();
+  }
+  function fillRuleParams(){const box=el('ruleParams');if(!box)return;
+    box.innerHTML=RULES[btRule].p.map(p=>'<span class="field"><span>'+p[1]+'</span><input type="number" data-k="'+p[0]+'" value="'+btParams[p[0]]+'" min="'+p[3]+'" max="'+p[4]+'" step="'+p[5]+'"></span>').join('');}
+  function resetParams(){btParams={};RULES[btRule].p.forEach(p=>btParams[p[0]]=p[2]);}
+
+  // ---------- wiring the controls ----------
+  function pick(seg,attr,fn){const s=el(seg);if(!s)return;s.onclick=function(e){const b=e.target.closest('button');if(!b)return;
+    [...s.children].forEach(c=>c.classList.toggle('on',c===b));fn(b.dataset[attr]);};}
+  function wireBars(){
+    if(source==='sim'){
+      el('playBtn').onclick=()=>setPlay(!playing);
+      el('liveBtn').onclick=()=>{follow=true;setLive();draw();};
+      pick('speedSeg','sp',v=>{speed=+v;});
+      pick('scenSeg','scen',v=>{scen=v;nowMin=simStart();follow=true;setLive();fillSidePanels();draw();});
+      pick('tfSeg','tf',v=>{tf=+v;hover=-1;draw();});
+    } else {
+      el('instSel').onchange=function(){instIndex=+this.value;realEnd=series().length-1;if(view==='backtest')runBacktest();fillSidePanels();draw();};
+      pick('curSeg','cur',v=>{currency=v;if(view==='backtest')runBacktest();fillSidePanels();draw();});
+    }
+    pick('viewSeg','view',v=>{view=v;if(view==='backtest'){resetParams();runBacktest();}buildBars();fillSidePanels();hover=-1;draw();});
+    pick('modeSeg','mode',v=>{mode=v;draw();});
+    const rs=el('ruleSel');if(rs)rs.onchange=function(){btRule=this.value;resetParams();runBacktest();buildBars();fillSidePanels();draw();};
+    const rp=el('ruleParams');if(rp)rp.oninput=function(e){const i=e.target.closest('input');if(!i)return;btParams[i.dataset.k]=+i.value;runBacktest();fillSidePanels();draw();};
+    const lv=el('levInput');if(lv)lv.oninput=function(){btLev=Math.max(1,+this.value||1);runBacktest();fillSidePanels();draw();};
+  }
+  function setPlay(on){playing=on;const b=el('playBtn');if(b)b.innerHTML=on?'&#10073;&#10073; Pause':'&#9654; Play';}
+  function setLive(){const b=el('liveBtn');if(b){b.className='btn live '+(follow?'on':'off');b.innerHTML=follow?'&#9679; Live':'Back to now';}}
+
+  // ---------- scrolling back through the chart ----------
+  let dragX=null,dragEnd=0,dragScale=0;
+  cv.addEventListener('mousedown',function(e){dragX=e.clientX;const win=windowSlice();
+    dragScale=(win.V[win.n-1].t-win.V[0].t)/(cv.clientWidth-L-R);
+    dragEnd=source==='sim'?(follow?nowMin:Math.min(simEnd,nowMin)):series()[realEnd].t;});
+  window.addEventListener('mouseup',()=>{dragX=null;});
+  cv.addEventListener('mousemove',function(e){const rect=cv.getBoundingClientRect(),w=cv.clientWidth;
+    if(dragX!=null){const dx=e.clientX-dragX;if(Math.abs(dx)>3){hover=-1;tip.style.opacity=0;
+      const cs=series();let t=dragEnd-dx*dragScale;t=clamp(t,cs[0].t,source==='sim'?nowMin:cs[cs.length-1].t);
+      if(source==='sim'){simEnd=t;follow=(t>=nowMin-1e-6);setLive();}else{realEnd=clamp(idxAt(cs,t),0,cs.length-1);}draw();}return;}
+    const win=windowSlice(),n=win.n,inner=w-L-R;hover=clamp(Math.round(((e.clientX-rect.left-L)/inner)*(n-1)),0,n-1);
+    let tx=e.clientX-rect.left+14;if(tx>w-150)tx=e.clientX-rect.left-150;tip.style.left=tx+'px';tip.style.top=(e.clientY-rect.top+12)+'px';draw();});
+  cv.addEventListener('mouseleave',()=>{hover=-1;tip.style.opacity=0;draw();});
+  cv.addEventListener('wheel',function(e){e.preventDefault();const cs=series(),win=windowSlice(),span=win.V[win.n-1].t-win.V[0].t;
+    let t=(source==='sim'?(follow?nowMin:Math.min(simEnd,nowMin)):cs[realEnd].t)+(e.deltaY>0?-1:1)*span*0.12;
+    t=clamp(t,cs[0].t,source==='sim'?nowMin:cs[cs.length-1].t);
+    if(source==='sim'){simEnd=t;follow=(t>=nowMin-1e-6);setLive();}else{realEnd=clamp(idxAt(cs,t),0,cs.length-1);}draw();},{passive:false});
+
+  // ---------- the clock that drives a live simulation ----------
+  const simStart=()=>scenarioData().candles[0].t;
+  const simEndT=()=>scenarioData().candles.slice(-1)[0].t;
+  function loop(){const now=performance.now();if(!lastTick){lastTick=now;return;}const dt=Math.min(1,(now-lastTick)/1000);lastTick=now;
+    if(source!=='sim'||!playing)return;nowMin+=speed*dt;elapsed+=speed*dt;if(nowMin>=simEndT())nowMin=simStart();draw();}
+
+  // ---------- collapsible side panels ----------
+  document.querySelectorAll('.side h3').forEach(h=>h.onclick=()=>el(h.dataset.card).classList.toggle('closed'));
+
+  // ---------- switching between simulation and real market ----------
+  function switchSource(s){
+    source=s;
+    if(view==='agents'&&source==='real')view='price';       // no agents in real data
+    el('sourceSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.src===s));
+    if(source==='sim'){el('sub').textContent='MARKET SIMULATOR';
+      el('srcHint').textContent='A made-up market from a crowd of trading agents. Plays live and can be sped up.';
+      nowMin=simStart();follow=true;}
+    else{el('sub').textContent='REAL MARKETS';
+      el('srcHint').textContent='Actual daily prices (a snapshot). No fast-forward, scroll to look around. The strategy tester works here too.';
+      realEnd=series().length-1;}
+    if(view==='backtest'){resetParams();runBacktest();}
+    buildBars();fillSidePanels();draw();
+  }
+  el('sourceSeg').onclick=function(e){const b=e.target.closest('button');if(b)switchSource(b.dataset.src);};
+
+  // ---------- start ----------
+  const d=new Date();clockStartSec=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();
+  nowMin=simStart();resetParams();
+  el('foot').innerHTML='Agora &middot; a made-up market of trading agents, next to real prices, so you can test simple strategies on both. '
+    +'Real data is a snapshot from '+REAL.fetched+'. This is not investment advice.';
+  buildBars();fillSidePanels();window.addEventListener('resize',resize);resize();
+  setInterval(loop,33);
+})();
+</script>
+</body>
+</html>
