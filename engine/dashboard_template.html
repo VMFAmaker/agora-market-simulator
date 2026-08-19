@@ -112,7 +112,7 @@
       <button data-src="sim" class="on">Simulation</button>
       <button data-src="real">Real market</button>
     </div>
-    <span class="lbl" id="srcHint">A made-up market from a crowd of trading agents. Plays live and can be sped up.</span>
+    <span class="lbl" id="srcHint">A fresh, random market, different every time. Plays live, and New market makes another.</span>
   </div>
 
   <div class="layout">
@@ -142,7 +142,6 @@
 </div>
 
 <script>
-const SIM = __SIM_DATA__;
 const REAL = __REAL_DATA__;
 (function(){
   // ---------- small helpers ----------
@@ -181,8 +180,82 @@ const REAL = __REAL_DATA__;
     dip:{name:'Buy the dip',p:[['drop','dip %',6,1,30,0.5],['rise','take profit %',8,1,40,0.5]]}};
   let btRule='sma', btParams={}, btLev=1, bt=null;
 
+  // =====================================================================
+  // THE MARKET GENERATOR
+  // The simulation is built fresh here, in the browser, every time. So each
+  // load, each new market, and each scenario is a different random market,
+  // starting from the very first candle. The price is pushed around by three
+  // simple forces: value (a pull back to a slowly drifting fair price),
+  // momentum (a trend that feeds on itself), and noise. Volatility comes in
+  // bursts, which gives the clustering and the fat tails a real market has.
+  // =====================================================================
+  function gauss(){                                   // one random normal number
+    let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+  const FLAVOUR={
+    baseline:{vol:0.0016,jumpP:0.010,jump:0.020,drift:0,burst:0.012,crash:0,deep:1,panic:0,brk:0},
+    stress:  {vol:0.0018,jumpP:0.010,jump:0.020,drift:0.00003,burst:0.015,crash:0.55,deep:1.3,panic:1,brk:0},
+    breaker: {vol:0.0017,jumpP:0.010,jump:0.020,drift:0,burst:0.013,crash:0.5,deep:0.9,panic:0,brk:1},
+    full:    {vol:0.0024,jumpP:0.020,jump:0.026,drift:0.00001,burst:0.020,crash:0,deep:1,panic:0.5,brk:0},
+  };
+  function makeMarket(flavour){
+    const N=2700, F=FLAVOUR[flavour]||FLAVOUR.baseline;
+    let price=100, fair=100, vol=F.vol, mom=0;
+    let brkRef=100, brkRefT=0, haltUntil=-1, cooldown=0;
+    const closes=[], candles=[];
+    for(let i=0;i<N;i++){
+      fair*=Math.exp(F.drift + 0.0006*gauss());          // fair value wanders slowly
+      vol = F.vol*0.06 + vol*0.94;                        // volatility calms down
+      if(Math.random()<F.burst) vol*=1.8+Math.random()*3.2;   // ... but bursts now and then
+      const value=(fair-price)/price;
+      let ret = 0.02*value + 0.22*mom + vol*gauss();      // the three forces
+      if(Math.random()<F.jumpP) ret += F.jump*gauss();    // a news jump
+      let liq=0, halt=0;
+      if(F.crash>0 && i===Math.floor(N*F.crash)) ret -= (0.10+Math.random()*0.06)*F.deep;   // scenario crash
+      if(F.panic && mom<-0.008){ ret -= F.panic*0.012; if(Math.random()<0.3)liq=1; }         // panic selling
+      let next=price*Math.exp(ret);
+      if(F.brk){                                          // circuit breaker halts
+        if(i<=haltUntil){ halt=1; next=price; }
+        else { if(i-brkRefT>=30){brkRef=price;brkRefT=i;}
+          if(i>=cooldown && Math.abs(next/brkRef-1)>0.12){ haltUntil=i+50; cooldown=i+50+90; halt=1; next=price; } }
+      }
+      price=Math.max(0.5,next);
+      mom=0.9*mom+0.1*ret;
+      const o=i?closes[i-1]:100, wick=Math.max(price*vol,price*0.0008);
+      closes.push(price);
+      candles.push({t:i, o:+o.toFixed(2), h:+(Math.max(o,price)+Math.abs(gauss())*wick).toFixed(2),
+        l:+Math.max(0.5,Math.min(o,price)-Math.abs(gauss())*wick).toFixed(2), c:+price.toFixed(2),
+        v:Math.round(150+Math.abs(gauss())*350), liq:liq, halt:halt});
+    }
+    return summarise(candles);
+  }
+  function summarise(candles){                            // work out the stats and quality checks
+    const closes=candles.map(c=>c.c), r=[];
+    for(let i=4;i<closes.length;i++) r.push(Math.log(closes[i]/closes[i-4]));
+    let hi=-1e18,lo=1e18,vol=0,liq=0,pk=closes[0],dd=0,halts=0,inHalt=false;
+    for(const c of candles){ if(c.h>hi)hi=c.h; if(c.l<lo)lo=c.l; vol+=c.v; liq+=c.liq;
+      if(c.halt&&!inHalt){halts++;inHalt=true;} if(!c.halt)inHalt=false; }
+    for(const c of closes){ if(c>pk)pk=c; const d=c/pk-1; if(d<dd)dd=d; }
+    const m=r.reduce((a,b)=>a+b,0)/r.length, sd=Math.sqrt(r.reduce((a,b)=>a+(b-m)*(b-m),0)/r.length);
+    const kurt=sd>1e-9?r.reduce((a,b)=>a+Math.pow((b-m)/sd,4),0)/r.length:0;
+    const ac=(x,lag)=>{const mm=x.reduce((a,b)=>a+b,0)/x.length;let n=0,d=0;
+      for(let i=0;i<x.length-lag;i++)n+=(x[i]-mm)*(x[i+lag]-mm); for(const v of x)d+=(v-mm)*(v-mm); return d>1e-12?n/d:0;};
+    const absr=r.map(Math.abs); let cl=0; for(let k=1;k<=5;k++)cl+=ac(absr,k); cl/=5;
+    const spread=+(closes[closes.length-1]*0.0009).toFixed(3);
+    return {candles, config:{taker_fee:0.0002, avg_spread:spread},
+      facts:{kurtosis:+kurt.toFixed(2), vol_clustering:+cl.toFixed(3), return_autocorr:+ac(r,1).toFixed(3),
+        pass_fat_tails:kurt>3.5, pass_vol_clustering:cl>0.03},
+      summary:{init:+closes[0].toFixed(2), final:+closes[closes.length-1].toFixed(2),
+        pct:+((closes[closes.length-1]/closes[0]-1)*100).toFixed(2), high:+hi.toFixed(2), low:+lo.toFixed(2),
+        volume:Math.round(vol), n_trades:candles.length*80, avg_spread:spread,
+        max_drawdown:+(dd*100).toFixed(2), n_liquidations:liq, n_halts:halts}};
+  }
+
   // ---------- the candles we are showing right now ----------
-  function scenarioData(){ return SIM.scenarios[scen]; }
+  const simCache={};
+  function scenarioData(){ return simCache[scen] || (simCache[scen]=makeMarket(scen)); }
+  function newMarket(){ simCache[scen]=makeMarket(scen); nowMin=simStart(); follow=true; setLive(); }
   function instrument(){ return REAL.instruments[instIndex]; }
 
   function series(){
@@ -306,7 +379,7 @@ const REAL = __REAL_DATA__;
   function draw(){
     const w=cv.clientWidth,h=cv.clientHeight;ctx.clearRect(0,0,w,h);
     const win=windowSlice(),V=win.V,n=win.n;if(n<1)return;
-    const split=(view!=='price');
+    const split=(view==='backtest');
     if(!split){const r=drawPrice(V,n,T,h-B,w,false);xAxis(V,n,w,h-B);}
     else{const topB=T+(h-T-B-GAP)*0.6,botT=topB+GAP,botB=h-B;
       const r=drawPrice(V,n,T,topB,w,view==='backtest');
@@ -364,10 +437,13 @@ const REAL = __REAL_DATA__;
       el('side3').innerHTML='<div style="color:var(--muted);font-size:12px;line-height:1.6">Real daily prices from a public source, '
         +'a snapshot from when this page was built ('+REAL.fetched+'). Real markets do not fast-forward, so scroll the chart to look '
         +'around. Try the Strategy tester on this real data.</div>';return;}
-    el('side3Title').firstChild.textContent='Profit by agent';
-    el('side3').innerHTML=scenarioData().agents.map(function(a){const c=AGENT_COLOR[a.kind]||'#888',pos=a.pnl>=0;
-      return '<div class="lr"><span class="sw" style="background:'+c+'"></span><span class="nm">'+a.kind+'</span>'
-        +'<span class="'+(pos?'up':'down')+'">'+dollars(a.pnl)+'</span></div>';}).join('');
+    el('side3Title').firstChild.textContent='About this market';
+    const about={baseline:'A calm, everyday market. Value buyers and momentum chasers push the price around noise.',
+      stress:'Traders on borrowed money build up, then a shock forces them to sell all at once, a crash.',
+      breaker:'A sharp shock, with a circuit breaker that halts trading (grey bands) to arrest the fall.',
+      full:'A busier, more volatile market with more news and the odd panic.'}[scen]||'';
+    el('side3').innerHTML='<div style="color:var(--muted);font-size:12px;line-height:1.6">'+about
+      +' It is generated fresh every time, so no two runs are the same. Press <b>New market</b> for another.</div>';
   }
   function fillSidePanels(){fillStats();fillSide3();}
 
@@ -405,10 +481,11 @@ const REAL = __REAL_DATA__;
     if(source==='sim'){
       b1+='<button class="btn" id="playBtn">&#10073;&#10073; Pause</button>';
       b1+='<button class="btn live '+(follow?'on':'off')+'" id="liveBtn">&#9679; Live</button>';
+      b1+='<button class="btn" id="newBtn">&#8635; New market</button>';
       b1+='<span class="lbl" style="margin-left:6px">Speed</span><div class="seg" id="speedSeg">'
         +button('speedSeg','sp','0.016667','Real time',speed<0.02)+button('speedSeg','sp','1','60&times;',speed===1)+button('speedSeg','sp','5','300&times;',speed===5)+'</div>';
       b1+='<div class="spacer"></div><div class="seg blue" id="viewSeg">'
-        +button('viewSeg','view','price','Price',view==='price')+button('viewSeg','view','agents','Agents',view==='agents')+button('viewSeg','view','backtest','Strategy tester',view==='backtest')+'</div>';
+        +button('viewSeg','view','price','Price',view==='price')+button('viewSeg','view','backtest','Strategy tester',view==='backtest')+'</div>';
       b2+='<div class="seg" id="scenSeg">'+button('scenSeg','scen','baseline','Normal',scen==='baseline')
         +button('scenSeg','scen','stress','Leverage crash',scen==='stress')+button('scenSeg','scen','breaker','Crash + breaker',scen==='breaker')+button('scenSeg','scen','full','Full market',scen==='full')+'</div>';
       b2+='<span class="lbl" style="margin-left:6px">TF</span><div class="seg" id="tfSeg">'
@@ -437,8 +514,9 @@ const REAL = __REAL_DATA__;
     if(source==='sim'){
       el('playBtn').onclick=()=>setPlay(!playing);
       el('liveBtn').onclick=()=>{follow=true;setLive();draw();};
+      el('newBtn').onclick=()=>{newMarket();fillSidePanels();draw();};
       pick('speedSeg','sp',v=>{speed=+v;});
-      pick('scenSeg','scen',v=>{scen=v;nowMin=simStart();follow=true;setLive();fillSidePanels();draw();});
+      pick('scenSeg','scen',v=>{scen=v;newMarket();fillSidePanels();draw();});
       pick('tfSeg','tf',v=>{tf=+v;hover=-1;draw();});
     } else {
       el('instSel').onchange=function(){instIndex=+this.value;realEnd=series().length-1;if(view==='backtest')runBacktest();fillSidePanels();draw();};
@@ -486,7 +564,7 @@ const REAL = __REAL_DATA__;
     if(view==='agents'&&source==='real')view='price';       // no agents in real data
     el('sourceSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.src===s));
     if(source==='sim'){el('sub').textContent='MARKET SIMULATOR';
-      el('srcHint').textContent='A made-up market from a crowd of trading agents. Plays live and can be sped up.';
+      el('srcHint').textContent='A fresh, random market, different every time. Plays live, and New market makes another.';
       nowMin=simStart();follow=true;}
     else{el('sub').textContent='REAL MARKETS';
       el('srcHint').textContent='Actual daily prices (a snapshot). No fast-forward, scroll to look around. The strategy tester works here too.';

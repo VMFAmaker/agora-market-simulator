@@ -71,7 +71,7 @@ def main():
 
     with open(TEMPLATE, encoding="utf-8") as fh:
         html = fh.read()
-    html = html.replace("__SIM_DATA__", json.dumps(data)).replace("__REAL_DATA__", json.dumps(real))
+    html = html.replace("__REAL_DATA__", json.dumps(real))   # the simulation is now generated in the browser
     for out in (OUT_HTML, os.path.join(ROOT, "index.html")):   # index.html is what GitHub Pages serves
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(html)
