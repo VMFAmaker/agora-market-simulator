@@ -78,6 +78,9 @@ def main():
             print(f"  {name:16} FAILED  {type(e).__name__} {e}")
         time.sleep(0.5)                      # be gentle on the server
 
+    if not instruments:
+        print("No prices downloaded, keeping the existing file.")
+        return
     data = {"fetched": date.today().isoformat(), "usd_to_gbp": round(gbp_rate, 4),
             "instruments": instruments}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
