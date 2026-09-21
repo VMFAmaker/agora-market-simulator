@@ -1,5 +1,5 @@
 {
- "built": "2026-09-19",
+ "built": "2026-09-21",
  "securities": [
   {
    "symbol": "MSFT",
@@ -403,9 +403,9 @@
    "file": "data/daily/BTC-USD.json",
    "currency": "USD",
    "days": 3653,
-   "first": "2016-09-19",
-   "last": "2026-09-19",
-   "last_close": 81848.2422,
+   "first": "2016-09-21",
+   "last": "2026-09-21",
+   "last_close": 84777.9062,
    "intraday": [
     "1m",
     "1h"
@@ -419,10 +419,10 @@
    "is_index": false,
    "file": "data/daily/ETH-USD.json",
    "currency": "USD",
-   "days": 3237,
+   "days": 3239,
    "first": "2017-11-09",
-   "last": "2026-09-19",
-   "last_close": 2649.3601,
+   "last": "2026-09-21",
+   "last_close": 2723.25,
    "intraday": []
   }
  ],
@@ -477,10 +477,10 @@
    "is_index": true,
    "file": "data/daily/FTSE.json",
    "currency": "GBP",
-   "days": 2526,
-   "first": "2016-09-19",
-   "last": "2026-09-18",
-   "last_close": 10659.0996,
+   "days": 2525,
+   "first": "2016-09-21",
+   "last": "2026-09-21",
+   "last_close": 10771.2402,
    "intraday": []
   },
   {
@@ -491,10 +491,10 @@
    "is_index": true,
    "file": "data/daily/RUT.json",
    "currency": "USD",
-   "days": 2514,
+   "days": 2515,
    "first": "2016-09-19",
-   "last": "2026-09-18",
-   "last_close": 2860.3999,
+   "last": "2026-09-21",
+   "last_close": 2860.3965,
    "intraday": []
   }
  ]
