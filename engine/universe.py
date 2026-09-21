@@ -57,6 +57,11 @@ INDICES = [
     ("^RUT",  "Russell 2000"),
 ]
 
+# A small demo of intraday data. Free intraday history is short, so this is only
+# the last few days at 1 minute and the last couple of months at 1 hour, for a
+# handful of busy names. It shows the same bars in the same shape, just faster.
+INTRADAY_DEMO = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "BTC-USD"]
+
 def safe_name(symbol):
     """A filesystem safe name for a symbol, e.g. ^GSPC -> GSPC, BRK-B -> BRK-B."""
     return symbol.replace("^", "").replace("=", "_")

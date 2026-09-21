@@ -1,9 +1,9 @@
 """
-Build the dashboard page from the template and the latest real prices.
+Build the dashboard page from the template and the market catalogue.
 
-This just pours output/real_markets.json into dashboard_template.html and writes
-index.html (what the website serves) and Agora Dashboard.html. It needs nothing
-except plain Python, so the daily refresh job can run it quickly.
+The page no longer carries every price. It carries the small catalogue (the list
+of markets), and it loads each market's prices from data/ only when you pick it.
+So the file stays small and the page follows the whole universe.
 
     python build_page.py
 
@@ -15,11 +15,12 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 TEMPLATE = os.path.join(HERE, "dashboard_template.html")
-REAL = os.path.join(ROOT, "output", "real_markets.json")
+CATALOGUE = os.path.join(ROOT, "data", "catalogue.json")
 
-real = json.load(open(REAL, encoding="utf-8")) if os.path.exists(REAL) else \
-    {"fetched": "not downloaded", "usd_to_gbp": 0.79, "instruments": []}
-html = open(TEMPLATE, encoding="utf-8").read().replace("__REAL_DATA__", json.dumps(real))
+cat = json.load(open(CATALOGUE, encoding="utf-8")) if os.path.exists(CATALOGUE) else \
+    {"built": "not built", "securities": [], "indices": []}
+html = open(TEMPLATE, encoding="utf-8").read().replace("__CATALOGUE__", json.dumps(cat))
 for name in ("index.html", "Agora Dashboard.html"):
     open(os.path.join(ROOT, name), "w", encoding="utf-8").write(html)
-print("Built the page with real data from", real.get("fetched"))
+n = len(cat.get("securities", [])) + len(cat.get("indices", []))
+print(f"Built the page with a catalogue of {n} markets, built {cat.get('built')}")

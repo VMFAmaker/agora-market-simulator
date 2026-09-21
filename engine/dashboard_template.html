@@ -142,8 +142,13 @@
 </div>
 
 <script>
-const REAL = __REAL_DATA__;
+const CATALOGUE = __CATALOGUE__;
 (function(){
+  // quick lookups built from the catalogue
+  const IDX_NAME={}; (CATALOGUE.indices||[]).forEach(x=>IDX_NAME[x.symbol]=x.name);
+  const META={}; [...(CATALOGUE.securities||[]),...(CATALOGUE.indices||[])].forEach(m=>META[m.symbol]=m);
+  const safe=(sym)=>sym.replace(/\^/g,'').replace(/=/g,'_');
+  const curSym=(c)=>({USD:'$',GBP:'£',EUR:'€'}[c]||(c?c+' ':'$'));
   // ---------- small helpers ----------
   const el=(id)=>document.getElementById(id);
   const cv=el('chart'), ctx=cv.getContext('2d'), tip=el('tip');
@@ -169,7 +174,12 @@ const REAL = __REAL_DATA__;
   let follow=true, simEnd=0, WIN=110;
 
   // real market state
-  let instIndex=0, currency='USD', realEnd=0;
+  // realSym is the chosen market, realFreq is daily / hourly / minute, horizon
+  // is how far back to look on daily. Prices are fetched on demand and cached.
+  let realSym=null, realFreq='1d', horizon='Max', realBars=null, realMeta=null,
+      benchBars=null, realSeries=[], realEnd=0, realLoading=false;
+  const fileCache={};
+  const HZ={'1M':21,'3M':63,'6M':126,'1Y':252,'3Y':756,'5Y':1260,'Max':1e12};
 
   // strategy tester state
   const RULES={bh:{name:'Buy & hold',p:[]},
@@ -256,15 +266,47 @@ const REAL = __REAL_DATA__;
   const simCache={};
   function scenarioData(){ return simCache[scen] || (simCache[scen]=makeMarket(scen)); }
   function newMarket(){ simCache[scen]=makeMarket(scen); nowMin=simStart(); follow=true; setLive(); }
-  function instrument(){ return REAL.instruments[instIndex]; }
+
+  // ---------- loading real prices on demand ----------
+  async function loadBars(sym, freq){
+    const key=sym+'_'+freq;
+    if(fileCache[key]) return fileCache[key];
+    const path=(freq==='1d') ? 'data/daily/'+safe(sym)+'.json'
+                             : 'data/intraday/'+safe(sym)+'_'+freq+'.json';
+    const res=await fetch(path);
+    if(!res.ok) throw new Error('could not load '+path);
+    const obj=await res.json();
+    fileCache[key]=obj.bars;
+    return obj.bars;
+  }
+  async function loadMarket(sym, freq){
+    realSym=sym; realMeta=META[sym];
+    freq=freq||'1d';
+    realFreq=(freq==='1d'||((realMeta.intraday||[]).indexOf(freq)>=0))?freq:'1d';
+    realLoading=true; draw();
+    try{
+      realBars=await loadBars(sym, realFreq);
+      benchBars=null;
+      if(realFreq==='1d' && realMeta && realMeta.benchmark && !realMeta.is_index){
+        try{ benchBars=await loadBars(realMeta.benchmark,'1d'); }catch(e){ benchBars=null; }
+      }
+    }catch(e){ realBars=null; realLoading=false; drawError(e.message); return; }
+    realLoading=false;
+    rebuildRealSeries();
+    if(view==='backtest'){ resetParams(); runBacktest(); }
+    buildBars(); fillSidePanels(); draw();
+  }
+  function rebuildRealSeries(){
+    if(!realBars){ realSeries=[]; return; }
+    const cut=(realFreq==='1d') ? (HZ[horizon]||1e12) : 1e12;
+    const start=Math.max(0, realBars.length-cut);
+    realSeries=realBars.slice(start).map((b,i)=>({t:i,d:b.d,o:b.o,h:b.h,l:b.l,c:b.c,v:b.v}));
+    realEnd=realSeries.length-1;
+  }
 
   function series(){
     if(source==='sim') return aggregate(scenarioData().candles, tf);
-    // real market: apply the currency choice, then optionally group days
-    const inst=instrument(); const r=(currency==='GBP')?REAL.usd_to_gbp:1;
-    let cs=inst.candles;
-    if(r!==1) cs=cs.map(b=>({t:b.t,d:b.d,o:b.o*r,h:b.h*r,l:b.l*r,c:b.c*r,v:b.v}));
-    return cs;
+    return realSeries;
   }
   function aggregate(base,k){
     if(k<=1) return base;
@@ -365,18 +407,32 @@ const REAL = __REAL_DATA__;
     ctx.restore();ctx.fillStyle=MUTED;ctx.textAlign='left';ctx.font='11px Segoe UI';ctx.fillText('running profit of each agent type',L+2,yT+9);}
 
   function drawEquity(tA,tB,yT,yB,w){                       // strategy tester
+    if(!bt)return;const BENCH='#60a5fa';
     const cs=series(),a=idxAt(cs,tA),b=Math.min(cs.length,idxAt(cs,tB)+1);
-    let lo=0,hi=0;for(let i=a;i<b;i++){lo=Math.min(lo,bt.eqPct[i],bt.bhPct[i]);hi=Math.max(hi,bt.eqPct[i],bt.bhPct[i]);}
+    let lo=0,hi=0;for(let i=a;i<b;i++){lo=Math.min(lo,bt.eqPct[i],bt.bhPct[i]);hi=Math.max(hi,bt.eqPct[i],bt.bhPct[i]);
+      if(bt.benchPct){lo=Math.min(lo,bt.benchPct[i]);hi=Math.max(hi,bt.benchPct[i]);}}
     const pad=(hi-lo)*0.14||1;lo-=pad;hi+=pad;subFrame(lo,hi,yT,yB,w,true);
     const span=(tB-tA)||1,xt=(t)=>L+(w-L-R)*(t-tA)/span;ctx.save();ctx.beginPath();ctx.rect(L,yT-2,w-R-L,yB-yT+4);ctx.clip();
+    if(bt.benchPct){ctx.strokeStyle=BENCH;ctx.lineWidth=1.4;ctx.setLineDash([5,3]);ctx.beginPath();
+      for(let i=a;i<b;i++){const x=xt(cs[i].t),y=yAt(bt.benchPct[i],lo,hi,yT,yB);i===a?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();ctx.setLineDash([]);}
     ctx.strokeStyle=withAlpha(TEXT,0.45);ctx.lineWidth=1.4;ctx.beginPath();
     for(let i=a;i<b;i++){const x=xt(cs[i].t),y=yAt(bt.bhPct[i],lo,hi,yT,yB);i===a?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();
     ctx.strokeStyle=ACCENT;ctx.lineWidth=2;ctx.beginPath();
     for(let i=a;i<b;i++){const x=xt(cs[i].t),y=yAt(bt.eqPct[i],lo,hi,yT,yB);i===a?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();
-    ctx.restore();ctx.fillStyle=MUTED;ctx.textAlign='left';ctx.font='11px Segoe UI';ctx.fillText(RULES[btRule].name+' (teal) vs buy & hold (grey)',L+2,yT+9);}
+    ctx.restore();ctx.fillStyle=MUTED;ctx.textAlign='left';ctx.font='11px Segoe UI';
+    ctx.fillText(RULES[btRule].name+' (teal) vs buy & hold (grey)'+(bt.benchPct?' vs '+bt.benchName+' (blue)':''),L+2,yT+9);}
   const idxAt=(cs,t)=>{let lo=0,hi=cs.length-1;while(lo<hi){const m=(lo+hi)>>1;if(cs[m].t<t)lo=m+1;else hi=m;}return Math.max(0,lo);};
 
+  function drawMessage(msg){
+    const w=cv.clientWidth,h=cv.clientHeight;ctx.clearRect(0,0,w,h);
+    ctx.fillStyle=MUTED;ctx.font='14px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(msg,w/2,h/2);
+  }
+  function drawLoading(){drawMessage('Loading '+(realMeta?realMeta.name:'market')+' …');}
+  function drawError(msg){drawMessage(msg||'Could not load this market.');}
+
   function draw(){
+    if(source==='real' && (realLoading || !realBars)){ if(realLoading) drawLoading(); return; }
     const w=cv.clientWidth,h=cv.clientHeight;ctx.clearRect(0,0,w,h);
     const win=windowSlice(),V=win.V,n=win.n;if(n<1)return;
     const split=(view==='backtest');
@@ -395,24 +451,33 @@ const REAL = __REAL_DATA__;
     const cur=source==='sim'?(follow?simPrice():windowSlice().V.slice(-1)[0].c):series()[realEnd].c;
     const prev=source==='sim'?firstClose():series()[Math.max(0,realEnd-1)].c;
     const chg=cur-prev,p=prev?chg/prev*100:0,cls=chg>=0?'up':'down';
-    el('price').textContent=(currency==='GBP'?'£':'$')+money2(cur);el('price').className='price '+cls;
+    const sym=source==='sim'?'$':curSym(realMeta&&realMeta.currency);
+    el('price').textContent=sym+money2(cur);el('price').className='price '+cls;
     el('chg').className='chg '+cls;el('chg').textContent=(chg>=0?'▲ ':'▼ ')+money2(Math.abs(chg))+'  ('+pctTxt(p)+')';
     if(source==='sim'){el('qname').textContent='AGX  ·  '+clockNow();}
-    else{const inst=instrument();el('qname').textContent=inst.name+'  ·  '+series()[realEnd].d;}
+    else{el('qname').textContent=realMeta.name+'  ·  '+series()[realEnd].d;}
+  }
+  function growthWins(){
+    if(source==='sim') return [['1m',1],['5m',5],['15m',15],['30m',30]];
+    if(realFreq==='1h') return [['1h',1],['1D',7],['1W',35],['1M',150]];
+    if(realFreq==='1m') return [['5m',5],['30m',30],['1h',60],['1D',390]];
+    return [['1D',1],['1W',5],['1M',21],['3M',63]];
   }
   function fillGrowth(){
     const cs=series();const end=source==='sim'?Math.max(0,Math.min(cs.length-1,Math.round(nowMin-cs[0].t))):realEnd;
     const cur=cs[end].c;
-    const wins=source==='sim'?[['1m',1],['5m',5],['15m',15],['30m',30]]:[['1D',1],['1W',5],['1M',22],['3M',66]];
-    el('growth').innerHTML=wins.map(function(wn){const ref=cs[Math.max(0,end-wn[1])].c,g=(cur/ref-1)*100,cls=g>=0?'up':'down';
+    el('growth').innerHTML=growthWins().map(function(wn){const ref=cs[Math.max(0,end-wn[1])].c,g=(cur/ref-1)*100,cls=g>=0?'up':'down';
       return '<div class="cell"><div class="k">'+wn[0]+'</div><div class="v '+cls+'">'+pctTxt(g)+'</div></div>';}).join('');
   }
   function fillStats(){
     let rows;
     if(view==='backtest'&&bt){const s=bt.stats,al=s.ret-s.bhret;
       rows=[['Strategy return',pctTxt(s.ret),s.ret>=0?'up':'down'],['Buy & hold',pctTxt(s.bhret),s.bhret>=0?'up':'down'],
-        ['Beats hold by',pctTxt(al),al>=0?'up':'down'],['Round trips',s.trades,''],['Win rate',s.win.toFixed(0)+'%',''],
-        ['Worst drop',s.maxdd.toFixed(1)+'%','down'],['In the market',s.timeIn.toFixed(0)+'%','']];
+        ['Beats hold by',pctTxt(al),al>=0?'up':'down']];
+      if(s.benchret!=null){rows.push([bt.benchName+' return',pctTxt(s.benchret),s.benchret>=0?'up':'down'],
+        ['Excess vs benchmark',pctTxt(s.excess),s.excess>=0?'up':'down']);}
+      rows.push(['Round trips',s.trades,''],['Win rate',s.win.toFixed(0)+'%',''],
+        ['Worst drop',s.maxdd.toFixed(1)+'%','down'],['In the market',s.timeIn.toFixed(0)+'%','']);
       if(bt.blew)rows.unshift(['Outcome','BLEW UP','down']);
     } else if(source==='sim'){const s=scenarioData().summary,f=scenarioData().facts;
       const tag=(ok)=>'<span class="tag '+(ok?'yes':'no')+'">'+(ok?'yes':'no')+'</span>';
@@ -420,23 +485,27 @@ const REAL = __REAL_DATA__;
         ['Worst drop',s.max_drawdown.toFixed(1)+'%','down'],['Forced sales',s.n_liquidations,''],['Halts',s.n_halts,''],
         ['Looks real? fat tails',(f.kurtosis!=null?f.kurtosis:'--')+' '+tag(f.pass_fat_tails),''],
         ['Looks real? clustering',(f.vol_clustering!=null?f.vol_clustering:'--')+' '+tag(f.pass_vol_clustering),'']];
-    } else {const cs=series(),inst=instrument();let hi=-1e18,lo=1e18;for(const b of cs){if(b.h>hi)hi=b.h;if(b.l<lo)lo=b.l;}
-      const sym=currency==='GBP'?'£':'$';
-      rows=[['Market',inst.name,''],['Group',inst.group,''],['Shown in',currency,''],
-        ['Last price',sym+money2(cs[realEnd].c),''],['2y high',sym+money2(hi),''],['2y low',sym+money2(lo),''],
-        ['As of',cs[realEnd].d,''],['Days of data',cs.length,'']];
+    } else {const cs=series();let hi=-1e18,lo=1e18;for(const b of cs){if(b.h>hi)hi=b.h;if(b.l<lo)lo=b.l;}
+      const sym=curSym(realMeta.currency),freqName={'1d':'Daily','1h':'Hourly','1m':'1 minute'}[realFreq];
+      rows=[['Market',realMeta.name,''],['Group',realMeta.group,''],['Frequency',freqName,'']];
+      if(realFreq==='1d')rows.push(['Horizon',horizon,'']);
+      if(!realMeta.is_index&&realMeta.benchmark)rows.push(['Benchmark',IDX_NAME[realMeta.benchmark]||realMeta.benchmark,'']);
+      rows.push(['Last price',sym+money2(cs[realEnd].c),''],['Window high',sym+money2(hi),''],
+        ['Window low',sym+money2(lo),''],['As of',cs[realEnd].d,''],['Bars shown',cs.length,'']);
     }
     el('stats').innerHTML=rows.map(r=>'<div class="r"><span class="k">'+r[0]+'</span><span class="v'+(r[2]?' '+r[2]:'')+'">'+r[1]+'</span></div>').join('');
   }
   function fillSide3(){
     if(view==='backtest'){el('side3Title').firstChild.textContent='How to read it';
+      const benchBit=(source==='real'&&bt&&bt.benchName)?' The blue dashed line is the benchmark, '+bt.benchName+'.':'';
       el('side3').innerHTML='<div style="color:var(--muted);font-size:12px;line-height:1.6">The teal line is your rule’s account. '
-        +'The grey line is simply buying and holding. Green triangles are buys, red are sells. Costs (the spread and a small fee) '
+        +'The grey line is simply buying and holding.'+benchBit+' Green triangles are buys, red are sells. Costs (the spread and a small fee) '
         +'are charged on every trade. Turn up leverage to trade bigger, and risk a blow-up.</div>';return;}
     if(source==='real'){el('side3Title').firstChild.textContent='About';
-      el('side3').innerHTML='<div style="color:var(--muted);font-size:12px;line-height:1.6">Real daily prices from a public source, '
-        +'a snapshot from when this page was built ('+REAL.fetched+'). Real markets do not fast-forward, so scroll the chart to look '
-        +'around. Try the Strategy tester on this real data.</div>';return;}
+      el('side3').innerHTML='<div style="color:var(--muted);font-size:12px;line-height:1.6">Real prices from a public source, '
+        +'refreshed daily so the page follows the current market. Pick any company or index, choose the horizon, and switch to hourly '
+        +'or 1 minute where it is offered. Real markets do not fast-forward, so scroll the chart to look around. The strategy tester '
+        +'works here too, against the market’s own benchmark index.</div>';return;}
     el('side3Title').firstChild.textContent='About this market';
     const about={baseline:'A calm, everyday market. Value buyers and momentum chasers push the price around noise.',
       stress:'Traders on borrowed money build up, then a shock forces them to sell all at once, a crash.',
@@ -458,8 +527,19 @@ const REAL = __REAL_DATA__;
     if(rule==='breakout'){const w=pm.win|0;let st=0;for(let i=0;i<n;i++){if(i>=w){let hi=-1e18,lo=1e18;for(let j=i-w;j<i;j++){if(P[j]>hi)hi=P[j];if(P[j]<lo)lo=P[j];}if(st===0&&P[i]>hi)st=1;else if(st===1&&P[i]<lo)st=0;}pos[i]=st;}return pos;}
     if(rule==='dip'){const drop=pm.drop/100,rise=pm.rise/100;let st=0,peak=P[0],entry=0;for(let i=0;i<n;i++){peak=Math.max(peak,P[i]);if(st===0){if(P[i]<peak*(1-drop)){st=1;entry=P[i];}}else{if(P[i]>entry*(1+rise)){st=0;peak=P[i];}}pos[i]=st;}return pos;}
     return pos;}
+  function benchSeriesFor(cs){
+    // line up the benchmark index with the shown dates, so returns compare fairly
+    if(!(source==='real'&&realFreq==='1d'&&benchBars))return null;
+    const bmap={};for(const b of benchBars)bmap[b.d]=b.c;
+    const bc=cs.map(b=>bmap[b.d]);
+    let last=null;for(let i=0;i<bc.length;i++){if(bc[i]==null)bc[i]=last;else last=bc[i];}
+    let first=bc.find(x=>x!=null);if(first==null)return null;
+    for(let i=0;i<bc.length&&bc[i]==null;i++)bc[i]=first;
+    const base=bc[0];return bc.map(x=>x/base*100-100);
+  }
   function runBacktest(){
     const cs=series(),P=cs.map(b=>b.c),n=P.length,pos=positions(P,btRule,btParams);
+    if(n<2){bt=null;return;}
     const halfSpread=(source==='sim'?(scenarioData().summary.avg_spread||0):P[n-1]*0.0005)*0.5;
     const fee=(source==='sim'?(scenarioData().config.taker_fee||0.0002):0.0002);
     let cash=START,shares=0,entry=0,wins=0,trips=0,blew=false;const eq=new Array(n),trades=[];
@@ -470,12 +550,25 @@ const REAL = __REAL_DATA__;
       const equity=cash+shares*price;eq[i]=equity;if(equity<=0){blew=true;for(let j=i;j<n;j++)eq[j]=0;}
     }
     const bh=P.map(p=>START*p/P[0]);let peak=-1e18,dd=0;for(const e of eq){if(e>peak)peak=e;const d=peak>0?e/peak-1:0;if(d<dd)dd=d;}
-    bt={trades,eqPct:eq.map(e=>e/START*100-100),bhPct:bh.map(e=>e/START*100-100),blew,
-      stats:{ret:eq[n-1]/START*100-100,bhret:bh[n-1]/START*100-100,trades:trips,win:trips?wins/trips*100:0,maxdd:dd*100,timeIn:pos.reduce((a,b)=>a+b,0)/n*100}};
+    const benchPct=benchSeriesFor(cs);const ret=eq[n-1]/START*100-100;
+    const benchret=benchPct?benchPct[n-1]:null;
+    bt={trades,eqPct:eq.map(e=>e/START*100-100),bhPct:bh.map(e=>e/START*100-100),benchPct,blew,
+      benchName:(benchPct&&realMeta)?(IDX_NAME[realMeta.benchmark]||realMeta.benchmark):null,
+      stats:{ret,bhret:bh[n-1]/START*100-100,benchret,excess:benchret!=null?ret-benchret:null,
+        trades:trips,win:trips?wins/trips*100:0,maxdd:dd*100,timeIn:pos.reduce((a,b)=>a+b,0)/n*100}};
   }
 
   // ---------- building the control bars ----------
   function button(seg,dataAttr,val,label,on){return '<button data-'+dataAttr+'="'+val+'"'+(on?' class="on"':'')+'>'+label+'</button>';}
+  function marketOptions(){                                  // grouped by sector, then the indices
+    const secs=CATALOGUE.securities||[], idx=CATALOGUE.indices||[], groups={};
+    secs.forEach(m=>{(groups[m.group]=groups[m.group]||[]).push(m);});
+    const opt=(m)=>'<option value="'+m.symbol+'"'+(m.symbol===realSym?' selected':'')+'>'+m.name+'</option>';
+    let h='';
+    Object.keys(groups).forEach(g=>{h+='<optgroup label="'+g+'">'+groups[g].map(opt).join('')+'</optgroup>';});
+    if(idx.length)h+='<optgroup label="Indices">'+idx.map(opt).join('')+'</optgroup>';
+    return h;
+  }
   function buildBars(){
     let b1='',b2='';
     if(source==='sim'){
@@ -491,9 +584,17 @@ const REAL = __REAL_DATA__;
       b2+='<span class="lbl" style="margin-left:6px">TF</span><div class="seg" id="tfSeg">'
         +button('tfSeg','tf','1','1m',tf===1)+button('tfSeg','tf','5','5m',tf===5)+button('tfSeg','tf','15','15m',tf===15)+button('tfSeg','tf','30','30m',tf===30)+'</div>';
     } else {
-      b1+='<span class="lbl">Market</span><select id="instSel">'+REAL.instruments.map((m,i)=>'<option value="'+i+'"'+(i===instIndex?' selected':'')+'>'+m.group+' – '+m.name+'</option>').join('')+'</select>';
-      b1+='<span class="lbl" style="margin-left:8px">Show in</span><div class="seg" id="curSeg">'+button('curSeg','cur','USD','USD',currency==='USD')+button('curSeg','cur','GBP','GBP',currency==='GBP')+'</div>';
+      b1+='<span class="lbl">Market</span><select id="mktSel">'+marketOptions()+'</select>';
+      const intr=(realMeta&&realMeta.intraday)||[];
+      b1+='<span class="lbl" style="margin-left:8px">Data</span><div class="seg" id="freqSeg">'
+        +button('freqSeg','freq','1d','Daily',realFreq==='1d')
+        +(intr.indexOf('1h')>=0?button('freqSeg','freq','1h','1h',realFreq==='1h'):'')
+        +(intr.indexOf('1m')>=0?button('freqSeg','freq','1m','1m',realFreq==='1m'):'')+'</div>';
       b1+='<div class="spacer"></div><div class="seg blue" id="viewSeg">'+button('viewSeg','view','price','Price',view==='price')+button('viewSeg','view','backtest','Strategy tester',view==='backtest')+'</div>';
+    }
+    if(source==='real'&&realFreq==='1d'){
+      b2+='<span class="lbl">Horizon</span><div class="seg" id="hzSeg">'
+        +['1M','3M','6M','1Y','3Y','5Y','Max'].map(k=>button('hzSeg','hz',k,k,horizon===k)).join('')+'</div>';
     }
     b2+='<div class="seg" id="modeSeg">'+button('modeSeg','mode','candle','Candles',mode==='candle')+button('modeSeg','mode','line','Line',mode==='line')+'</div>';
     if(view==='backtest'){b2+='<span class="lbl" style="margin-left:6px">Rule</span><select id="ruleSel">'
@@ -519,8 +620,9 @@ const REAL = __REAL_DATA__;
       pick('scenSeg','scen',v=>{scen=v;newMarket();fillSidePanels();draw();});
       pick('tfSeg','tf',v=>{tf=+v;hover=-1;draw();});
     } else {
-      el('instSel').onchange=function(){instIndex=+this.value;realEnd=series().length-1;if(view==='backtest')runBacktest();fillSidePanels();draw();};
-      pick('curSeg','cur',v=>{currency=v;if(view==='backtest')runBacktest();fillSidePanels();draw();});
+      const ms=el('mktSel');if(ms)ms.onchange=function(){loadMarket(this.value, realFreq);};
+      pick('freqSeg','freq',v=>{loadMarket(realSym, v);});
+      pick('hzSeg','hz',v=>{horizon=v;rebuildRealSeries();if(view==='backtest')runBacktest();fillSidePanels();draw();});
     }
     pick('viewSeg','view',v=>{view=v;if(view==='backtest'){resetParams();runBacktest();}buildBars();fillSidePanels();hover=-1;draw();});
     pick('modeSeg','mode',v=>{mode=v;draw();});
@@ -532,19 +634,20 @@ const REAL = __REAL_DATA__;
   function setLive(){const b=el('liveBtn');if(b){b.className='btn live '+(follow?'on':'off');b.innerHTML=follow?'&#9679; Live':'Back to now';}}
 
   // ---------- scrolling back through the chart ----------
+  const noReal=()=>source==='real'&&(!realBars||!realSeries.length);
   let dragX=null,dragEnd=0,dragScale=0;
-  cv.addEventListener('mousedown',function(e){dragX=e.clientX;const win=windowSlice();
+  cv.addEventListener('mousedown',function(e){if(noReal())return;dragX=e.clientX;const win=windowSlice();
     dragScale=(win.V[win.n-1].t-win.V[0].t)/(cv.clientWidth-L-R);
     dragEnd=source==='sim'?(follow?nowMin:Math.min(simEnd,nowMin)):series()[realEnd].t;});
   window.addEventListener('mouseup',()=>{dragX=null;});
-  cv.addEventListener('mousemove',function(e){const rect=cv.getBoundingClientRect(),w=cv.clientWidth;
+  cv.addEventListener('mousemove',function(e){if(noReal())return;const rect=cv.getBoundingClientRect(),w=cv.clientWidth;
     if(dragX!=null){const dx=e.clientX-dragX;if(Math.abs(dx)>3){hover=-1;tip.style.opacity=0;
       const cs=series();let t=dragEnd-dx*dragScale;t=clamp(t,cs[0].t,source==='sim'?nowMin:cs[cs.length-1].t);
       if(source==='sim'){simEnd=t;follow=(t>=nowMin-1e-6);setLive();}else{realEnd=clamp(idxAt(cs,t),0,cs.length-1);}draw();}return;}
     const win=windowSlice(),n=win.n,inner=w-L-R;hover=clamp(Math.round(((e.clientX-rect.left-L)/inner)*(n-1)),0,n-1);
     let tx=e.clientX-rect.left+14;if(tx>w-150)tx=e.clientX-rect.left-150;tip.style.left=tx+'px';tip.style.top=(e.clientY-rect.top+12)+'px';draw();});
   cv.addEventListener('mouseleave',()=>{hover=-1;tip.style.opacity=0;draw();});
-  cv.addEventListener('wheel',function(e){e.preventDefault();const cs=series(),win=windowSlice(),span=win.V[win.n-1].t-win.V[0].t;
+  cv.addEventListener('wheel',function(e){if(noReal())return;e.preventDefault();const cs=series(),win=windowSlice(),span=win.V[win.n-1].t-win.V[0].t;
     let t=(source==='sim'?(follow?nowMin:Math.min(simEnd,nowMin)):cs[realEnd].t)+(e.deltaY>0?-1:1)*span*0.12;
     t=clamp(t,cs[0].t,source==='sim'?nowMin:cs[cs.length-1].t);
     if(source==='sim'){simEnd=t;follow=(t>=nowMin-1e-6);setLive();}else{realEnd=clamp(idxAt(cs,t),0,cs.length-1);}draw();},{passive:false});
@@ -565,12 +668,15 @@ const REAL = __REAL_DATA__;
     el('sourceSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.src===s));
     if(source==='sim'){el('sub').textContent='MARKET SIMULATOR';
       el('srcHint').textContent='A fresh, random market, different every time. Plays live, and New market makes another.';
-      nowMin=simStart();follow=true;}
-    else{el('sub').textContent='REAL MARKETS';
-      el('srcHint').textContent='Actual daily prices (a snapshot). No fast-forward, scroll to look around. The strategy tester works here too.';
-      realEnd=series().length-1;}
-    if(view==='backtest'){resetParams();runBacktest();}
-    buildBars();fillSidePanels();draw();
+      nowMin=simStart();follow=true;
+      if(view==='backtest'){resetParams();runBacktest();}
+      buildBars();fillSidePanels();draw();
+    } else {
+      el('sub').textContent='REAL MARKETS';
+      el('srcHint').textContent='Real prices, refreshed daily so the page follows the market. Pick a company or index, and the tester works here too.';
+      const first=((CATALOGUE.securities||[])[0]||(CATALOGUE.indices||[])[0]||{}).symbol;
+      loadMarket(realSym||first, realFreq);                  // async, it builds the bars and redraws
+    }
   }
   el('sourceSeg').onclick=function(e){const b=e.target.closest('button');if(b)switchSource(b.dataset.src);};
 
@@ -578,7 +684,7 @@ const REAL = __REAL_DATA__;
   const d=new Date();clockStartSec=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();
   nowMin=simStart();resetParams();
   el('foot').innerHTML='Agora &middot; a made-up market of trading agents, next to real prices, so you can test simple strategies on both. '
-    +'Real data is a snapshot from '+REAL.fetched+'. This is not investment advice.';
+    +'Real prices are refreshed daily (catalogue built '+CATALOGUE.built+'). This is not investment advice.';
   buildBars();fillSidePanels();window.addEventListener('resize',resize);resize();
   setInterval(loop,33);
 })();

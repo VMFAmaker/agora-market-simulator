@@ -18,8 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Download the latest prices
-        run: python engine/fetch_markets.py
+      - name: Download the latest prices for the whole universe
+        run: python engine/fetch_data.py
       - name: Rebuild the page
         run: python engine/build_page.py
       - name: Commit and push if anything changed

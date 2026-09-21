@@ -1,9 +1,9 @@
 """
-Run Agora and build the dashboard.
+Run the full Agora agent model and print a report.
 
 This runs four versions of the market (four "scenarios"), prints a short report
-for each, saves the raw numbers to output/simulation.json, and drops them into the
-dashboard page (Agora Dashboard.html in the folder above).
+for each, and saves the raw numbers to output/simulation.json. It is for studying
+the agent model. The website page is built separately by build_page.py.
 
     python run_simulation.py
     python run_simulation.py 7      # use a different random seed
@@ -19,9 +19,7 @@ from agora import Simulation, Config
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-TEMPLATE = os.path.join(HERE, "dashboard_template.html")
 OUT_JSON = os.path.join(ROOT, "output", "simulation.json")
-OUT_HTML = os.path.join(ROOT, "Agora Dashboard.html")
 
 
 def report(name, result):
@@ -59,25 +57,8 @@ def main():
     with open(OUT_JSON, "w", encoding="utf-8") as fh:
         json.dump(data, fh)
 
-    # real market prices, if they have been downloaded (run fetch_markets.py)
-    real_path = os.path.join(ROOT, "output", "real_markets.json")
-    if os.path.exists(real_path):
-        with open(real_path, encoding="utf-8") as fh:
-            real = json.load(fh)
-        print(f"\nUsing {len(real['instruments'])} real markets from {real['fetched']}")
-    else:
-        real = {"fetched": "not downloaded", "usd_to_gbp": 0.79, "instruments": []}
-        print("\nNo real market data found (run: python fetch_markets.py)")
-
-    with open(TEMPLATE, encoding="utf-8") as fh:
-        html = fh.read()
-    html = html.replace("__REAL_DATA__", json.dumps(real))   # the simulation is now generated in the browser
-    for out in (OUT_HTML, os.path.join(ROOT, "index.html")):   # index.html is what GitHub Pages serves
-        with open(out, "w", encoding="utf-8") as fh:
-            fh.write(html)
-
-    print(f"Saved {OUT_JSON}")
-    print(f"Saved {OUT_HTML}  (open it in a browser)")
+    print(f"\nSaved {OUT_JSON}")
+    print("To build the website page, run: python build_page.py")
 
 
 if __name__ == "__main__":
