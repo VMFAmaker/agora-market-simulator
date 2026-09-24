@@ -1,5 +1,5 @@
 {
- "built": "2026-09-23",
+ "built": "2026-09-24",
  "securities": [
   {
    "symbol": "MSFT",
@@ -9,10 +9,10 @@
    "is_index": false,
    "file": "data/daily/MSFT.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 501.61,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 500.59,
    "intraday": [
     "1m",
     "1h"
@@ -26,10 +26,10 @@
    "is_index": false,
    "file": "data/daily/AAPL.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 338.98,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 337.02,
    "intraday": [
     "1m",
     "1h"
@@ -43,10 +43,10 @@
    "is_index": false,
    "file": "data/daily/NVDA.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 227.38,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 225.51,
    "intraday": [
     "1m",
     "1h"
@@ -60,10 +60,10 @@
    "is_index": false,
    "file": "data/daily/AMZN.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 258.45,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 249.27,
    "intraday": [
     "1m",
     "1h"
@@ -77,10 +77,10 @@
    "is_index": false,
    "file": "data/daily/GOOGL.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 354.97,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 337.83,
    "intraday": []
   },
   {
@@ -91,10 +91,10 @@
    "is_index": false,
    "file": "data/daily/META.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 741.25,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 744.1,
    "intraday": []
   },
   {
@@ -105,10 +105,10 @@
    "is_index": false,
    "file": "data/daily/TSLA.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 375.3,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 380.12,
    "intraday": [
     "1m",
     "1h"
@@ -122,10 +122,10 @@
    "is_index": false,
    "file": "data/daily/JPM.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 352.04,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 337.53,
    "intraday": []
   },
   {
@@ -137,9 +137,9 @@
    "file": "data/daily/GS.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 959.39,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 936.36,
    "intraday": []
   },
   {
@@ -150,10 +150,10 @@
    "is_index": false,
    "file": "data/daily/BAC.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 57.96,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 56.0,
    "intraday": []
   },
   {
@@ -165,9 +165,9 @@
    "file": "data/daily/V.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 369.95,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 361.52,
    "intraday": []
   },
   {
@@ -179,9 +179,9 @@
    "file": "data/daily/BRK-B.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 502.01,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 507.17,
    "intraday": []
   },
   {
@@ -192,10 +192,10 @@
    "is_index": false,
    "file": "data/daily/WMT.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 107.44,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 110.53,
    "intraday": []
   },
   {
@@ -207,9 +207,9 @@
    "file": "data/daily/KO.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 87.12,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 88.09,
    "intraday": []
   },
   {
@@ -220,10 +220,10 @@
    "is_index": false,
    "file": "data/daily/MCD.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 247.88,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 238.32,
    "intraday": []
   },
   {
@@ -235,9 +235,9 @@
    "file": "data/daily/PG.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 146.08,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 147.39,
    "intraday": []
   },
   {
@@ -248,10 +248,10 @@
    "is_index": false,
    "file": "data/daily/NKE.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 36.1,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 36.05,
    "intraday": []
   },
   {
@@ -263,9 +263,9 @@
    "file": "data/daily/COST.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 898.48,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 904.7,
    "intraday": []
   },
   {
@@ -276,10 +276,10 @@
    "is_index": false,
    "file": "data/daily/BA.json",
    "currency": "USD",
-   "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 201.15,
+   "days": 2512,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 199.93,
    "intraday": []
   },
   {
@@ -291,9 +291,9 @@
    "file": "data/daily/CAT.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 816.5,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 812.02,
    "intraday": []
   },
   {
@@ -305,9 +305,9 @@
    "file": "data/daily/GE.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 319.01,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 319.8,
    "intraday": []
   },
   {
@@ -319,9 +319,9 @@
    "file": "data/daily/HON.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 206.48,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 212.57,
    "intraday": []
   },
   {
@@ -333,9 +333,9 @@
    "file": "data/daily/XOM.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 158.3,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 161.23,
    "intraday": []
   },
   {
@@ -347,9 +347,9 @@
    "file": "data/daily/CVX.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 203.67,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 205.51,
    "intraday": []
   },
   {
@@ -361,9 +361,9 @@
    "file": "data/daily/JNJ.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 269.47,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 269.17,
    "intraday": []
   },
   {
@@ -375,9 +375,9 @@
    "file": "data/daily/UNH.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 377.56,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 371.29,
    "intraday": []
   },
   {
@@ -389,9 +389,9 @@
    "file": "data/daily/PFE.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 27.74,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 28.18,
    "intraday": []
   },
   {
@@ -403,9 +403,9 @@
    "file": "data/daily/BTC-USD.json",
    "currency": "USD",
    "days": 3653,
-   "first": "2016-09-23",
-   "last": "2026-09-23",
-   "last_close": 85829.25,
+   "first": "2016-09-24",
+   "last": "2026-09-24",
+   "last_close": 83496.9609,
    "intraday": [
     "1m",
     "1h"
@@ -419,10 +419,10 @@
    "is_index": false,
    "file": "data/daily/ETH-USD.json",
    "currency": "USD",
-   "days": 3241,
+   "days": 3242,
    "first": "2017-11-09",
-   "last": "2026-09-23",
-   "last_close": 2733.98,
+   "last": "2026-09-24",
+   "last_close": 2647.6399,
    "intraday": []
   }
  ],
@@ -436,9 +436,9 @@
    "file": "data/daily/GSPC.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 7764.7002,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 7706.0298,
    "intraday": []
   },
   {
@@ -450,9 +450,9 @@
    "file": "data/daily/IXIC.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 27122.0898,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 26936.0391,
    "intraday": []
   },
   {
@@ -464,9 +464,9 @@
    "file": "data/daily/DJI.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 52048.8281,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 51511.5898,
    "intraday": []
   },
   {
@@ -478,9 +478,9 @@
    "file": "data/daily/FTSE.json",
    "currency": "GBP",
    "days": 2524,
-   "first": "2016-09-23",
-   "last": "2026-09-23",
-   "last_close": 10714.0098,
+   "first": "2016-09-26",
+   "last": "2026-09-24",
+   "last_close": 10714.1699,
    "intraday": []
   },
   {
@@ -492,9 +492,9 @@
    "file": "data/daily/RUT.json",
    "currency": "USD",
    "days": 2511,
-   "first": "2016-09-23",
-   "last": "2026-09-21",
-   "last_close": 2875.3601,
+   "first": "2016-09-26",
+   "last": "2026-09-23",
+   "last_close": 2838.6599,
    "intraday": []
   }
  ]
