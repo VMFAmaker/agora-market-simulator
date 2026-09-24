@@ -55,6 +55,9 @@ INDICES = [
     ("^DJI",  "Dow Jones"),
     ("^FTSE", "FTSE 100"),
     ("^RUT",  "Russell 2000"),
+    # The indices above are PRICE indices, they leave dividends out. This one puts
+    # them back in, so it is the fair yardstick for a strategy that collects dividends.
+    ("^SP500TR", "S&P 500 Total Return"),
 ]
 
 # A small demo of intraday data. Free intraday history is short, so this is only
