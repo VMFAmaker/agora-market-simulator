@@ -1,38 +1,58 @@
-# Agora, a simple agent based market simulator
+# Agora, the engine
 
-Instead of drawing a price from a formula, Agora fills a market with lots of small
-software traders, each following one simple rule, and lets them buy and sell from
-each other on an order book. The price is just whatever they last traded at. Out
-of all these simple rules, realistic looking market behaviour appears on its own.
+Agora tests trading rules on real markets and on made up ones, with one backtest
+engine for both. It is split into four parts, the way professional backtesting
+systems are, and one rule holds them together. **A strategy never knows whether
+its prices are real or simulated.** It just receives bars.
 
 > Coding was done with the help of AI. I am not proficient at coding, so I set the
-> direction, made the decisions, and tested the app. The code is kept deliberately
-> simple so that I can read it.
+> direction, made the decisions, and tested the results. The code is kept simple
+> and heavily commented so that I can read it.
 
-## The idea that holds it together
+## The four parts
 
-A strategy should not know or care where its prices come from. It just reads bars.
-So a real company, a real index, and a made-up market all come through in the same
-simple shape (date, open, high, low, close, volume). The same rule can then be
-tested on Apple, on the S&P 500, or on a synthetic crash, without changing a line.
+| Part | Files | What it does |
+| --- | --- | --- |
+| **Market data** | `universe.py`, `fetch_data.py`, `market_data.py` | Downloads 29 companies and 6 indices, checks every bar, stores them in one strict shape, and gives strategies a history that stops at "now". |
+| **Strategy engine** | `indicators.py`, `strategies.py` | Seven rules. Each one only turns bars into a signal (BUY, SELL or HOLD, with a reason). |
+| **Market simulator** | `simulator.py`, `agora.py` | Six controlled synthetic markets for stress tests, and the full agent based order book model for study. |
+| **Strategy tester** | `sizing.py`, `execution.py`, `portfolio.py`, `backtest.py`, `metrics.py`, `tester.py` | Sizes the order, fills it with costs, keeps the account, runs experiments and measures them. |
+| Research report | `run_research.py` | Runs the whole study and draws the charts for the Word report. |
+| The web page | `backtest.js`, `dashboard_template.html`, `build_page.py` | The same engine in JavaScript, and the page that uses it. |
 
-## Two simulations, and why
+## The rules that stop a backtest cheating
 
-- **The full model** is the Python file `agora.py`. It runs the real agent based
-  order book, with ten trader types, a leverage crash, and a circuit breaker, and
-  checks the result against the facts a real market shows. Run it to study the model.
-- **The dashboard** builds its own market in the browser (a lighter generator, in
-  `dashboard_template.html`). This is so every visit and every "New market" gives a
-  fresh, random market from the first candle, which a fixed page could not do if it
-  just replayed one baked run.
+**The time frontier.** `backtest.py` walks through history one bar at a time. A bar
+only reaches the strategy once it has closed, and any order is filled at the NEXT
+bar's open. At 10.35 a strategy knows the 10.35 close and nothing after it. The
+history object is filled one bar at a time, so a bar that has not arrived yet is
+simply not there to peek at.
 
-## Real market data
+**Which price.** Prices are split adjusted, so every percentage move is real.
+Dividends are stored as events and paid into the account as cash on the ex-dividend
+day. The dividend adjusted close is kept only as a check, because it rewrites past
+prices with dividends that were paid later.
 
-`fetch_data.py` downloads ten years of daily prices for the whole universe (29
-companies and 5 indices, set in `universe.py`), plus a small recent intraday demo
-(1 hour and 1 minute) for a few busy names. Each market is saved as its own file in
-`data/`, and `data/catalogue.json` lists them all. The page loads a market's file
-only when you pick it, so the page itself stays small.
+**Strict data.** Times are in the exchange's own time zone and label the start of
+each bar. Unfinished bars are dropped. Every bar is checked (high is the highest,
+low the lowest, times move forward, nothing is zero).
+
+**Signal, order, fill.** A strategy only says BUY. `sizing.py` decides how much,
+`portfolio.py` applies the limits (most in one asset, leverage, whole shares), and
+`execution.py` decides the fill price and every cost, the bid and ask spread,
+slippage, square root market impact, commission, and a cap on the share of daily
+volume one order can take.
+
+## Proof
+
+```
+python tests/test_engine.py     # 12 tests, including cutting off the future
+python tests/test_parity.py     # the browser engine and the Python engine agree
+```
+
+The key test runs a strategy on ten years of Microsoft, then again with everything
+after a cut off deleted, at four cut offs. The trades and the account before each
+cut off are identical. If the engine leaked the future, deleting it would change the past.
 
 ## Run it
 
@@ -40,39 +60,26 @@ only when you pick it, so the page itself stays small.
 pip install -r requirements.txt
 python fetch_data.py          # download the whole universe (needs internet)
 python build_page.py          # build the website page
-python run_simulation.py      # optional: run the full agent model and print a report
-python run_research.py        # optional: run the strategy study and draw the charts
+python run_research.py        # the full study, about four minutes
+python run_simulation.py      # optional: the full agent model
 ```
 
-`build_page.py` pours the catalogue into `dashboard_template.html` and writes
-`index.html` and `Agora Dashboard.html` in the folder above. The website refreshes
-the real prices by itself once a day, using the job in
-`.github/workflows/refresh-data.yml`, so the live page follows the current market.
+Or from Python:
 
-## What is inside
+```python
+from tester import Experiment, run
+res = run(Experiment("sma", symbols=["MSFT"], benchmark="^SP500TR", method="walk_forward"))
+print(res["main"]["metrics"]["cagr"], res["efficiency"])
+```
 
-| File | What it does |
-| --- | --- |
-| `agora.py` | The full agent model. Order book, traders, the clock, the checks. |
-| `universe.py` | The list of markets, their sectors and benchmark indices. |
-| `fetch_data.py` | Downloads daily (and demo intraday) prices, one file per market. |
-| `feeds.py` | The source agnostic layer. Real or synthetic, all become one Feed. |
-| `strategies.py` | The trading rules, each a small class that only sees prices. |
-| `tester.py` | Backtests a rule, compares it to a benchmark, and stress tests it. |
-| `run_research.py` | Runs the whole study across a basket and draws the charts. |
-| `build_page.py` | Builds the dashboard page from the template and the catalogue. |
-| `run_simulation.py` | Runs the full agent model and prints a report. |
-| `dashboard_template.html` | The web page, including the in-browser generator. |
+The methods are `backtest`, `out_of_sample`, `walk_forward` and `stress`, and every
+result also carries robustness checks (the same test at five levels of slippage, and
+next open fills against same close fills).
 
-## The traders (in the Python agent model)
+## The traders (in the agent model, agora.py)
 
-- **Noise** random flow, **market maker** quoting both sides, **momentum** buying
-  strength, **value** buying cheap and selling dear, and, in the busier scenarios,
-  **leveraged trend, mean reversion, breakout, news, whale and panic herd**.
-
-## Does it look like a real market?
-
-Both the model and the dashboard check two facts every real market shows. **Fat
-tails**, big moves happen more often than a bell curve says. **Volatility
-clustering**, busy and calm periods come in runs. The dashboard shows a yes or no
-for each in the Details panel.
+**Noise** random flow, **market maker** quoting both sides, **momentum** buying
+strength, **value** buying cheap and selling dear, and, in the busier scenarios,
+**leveraged trend, mean reversion, breakout, news, whale and panic herd**. The model
+checks that its market shows the two facts every real market shows, fat tails and
+volatility clustering.

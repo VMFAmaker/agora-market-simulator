@@ -1,1 +1,4 @@
-numpy>=1.24
+# The data download, the backtest engine, the tester and the page builder only
+# need Python's standard library. These two are for the extras.
+numpy>=1.24          # the full agent model, agora.py
+matplotlib>=3.7      # the research charts, run_research.py
