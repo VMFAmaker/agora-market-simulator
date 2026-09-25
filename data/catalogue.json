@@ -1,5 +1,5 @@
 {
- "built": "2026-09-24",
+ "built": "2026-09-25",
  "price_basis": "Open, high, low, close and volume are split adjusted. 'a' is the close adjusted for splits and dividends, kept only for checking. Dividends and splits are listed as events. Times are the exchange's local time and label the START of each bar.",
  "securities": [
   {
@@ -486,9 +486,9 @@
    "currency": "USD",
    "timezone": "UTC",
    "days": 3652,
-   "first": "2016-09-24",
-   "last": "2026-09-23",
-   "last_close": 84383.0078,
+   "first": "2016-09-25",
+   "last": "2026-09-24",
+   "last_close": 84379.0625,
    "dividends": 0,
    "splits": 0,
    "intraday": [
@@ -505,10 +505,10 @@
    "file": "data/daily/ETH-USD.json",
    "currency": "USD",
    "timezone": "UTC",
-   "days": 3241,
+   "days": 3242,
    "first": "2017-11-09",
-   "last": "2026-09-23",
-   "last_close": 2684.6919,
+   "last": "2026-09-24",
+   "last_close": 2687.3015,
    "dividends": 0,
    "splits": 0,
    "intraday": []
@@ -544,7 +544,7 @@
    "days": 2512,
    "first": "2016-09-26",
    "last": "2026-09-24",
-   "last_close": 26939.373,
+   "last_close": 26939.3691,
    "dividends": 0,
    "splits": 0,
    "intraday": []
@@ -578,7 +578,7 @@
    "days": 2524,
    "first": "2016-09-26",
    "last": "2026-09-24",
-   "last_close": 10679.9902,
+   "last_close": 10680.0,
    "dividends": 0,
    "splits": 0,
    "intraday": []
@@ -595,7 +595,7 @@
    "days": 2512,
    "first": "2016-09-26",
    "last": "2026-09-24",
-   "last_close": 2835.5742,
+   "last_close": 2835.5701,
    "dividends": 0,
    "splits": 0,
    "intraday": []
